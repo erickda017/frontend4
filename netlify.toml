@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# SPA: todas as rotas caem no index.html (o roteamento é feito no cliente).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
