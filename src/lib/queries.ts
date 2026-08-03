@@ -196,6 +196,29 @@ export function usePerfilConquistas() {
   });
 }
 
+/** Conquista dinâmica por artista/faixa/gênero, desbloqueada ou não, com
+ * progresso (atual/meta) calculado a partir do histórico real do usuário. */
+export type ConquistaDinamicaPreview = {
+  chave: string;
+  titulo: string;
+  descricao: string;
+  raridade: string;
+  desbloqueada: boolean;
+  atual: number;
+  meta: number;
+  metrica: "horas" | "plays" | "faixas";
+};
+
+export function useConquistasDinamicasPreview() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["conquistas-dinamicas-preview"],
+    queryFn: () =>
+      api.get<ConquistaDinamicaPreview[]>("/api/perfil/conquistas-dinamicas-preview"),
+    enabled: !!user,
+  });
+}
+
 export function usePerfilPlataformas() {
   const { user } = useAuth();
   return useQuery({
