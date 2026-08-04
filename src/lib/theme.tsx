@@ -9,7 +9,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 export const TEMAS = [
   { id: "sonora", nome: "Sonora", descricao: "Verde neon sobre roxo profundo" },
   { id: "dark-neon", nome: "Dark Neon", descricao: "Preto absoluto com cyan e magenta" },
-  { id: "minimalista", nome: "Minimalista", descricao: "Claro, limpo e sem ruído" },
+  { id: "violeta", nome: "Violeta", descricao: "Roxo-violeta vibrante, escuro do começo ao fim" },
 ] as const;
 
 export type TemaId = (typeof TEMAS)[number]["id"];
@@ -35,6 +35,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const salvo = window.localStorage.getItem(STORAGE_KEY);
+      // O tema claro "minimalista" foi removido: quem tinha ele salvo passa
+      // automaticamente para o novo tema roxo-violeta.
+      if (salvo === "minimalista") {
+        setTemaState("violeta");
+        window.localStorage.setItem(STORAGE_KEY, "violeta");
+        return;
+      }
       if (ehTema(salvo)) setTemaState(salvo);
     } catch {
       /* localStorage indisponível (modo privado): segue com o tema padrão */
@@ -44,7 +51,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const raiz = document.documentElement;
     raiz.dataset['theme'] = tema;
-    raiz.classList.toggle("dark", tema !== "minimalista");
+    // Todos os temas são escuros agora (não existe mais tema claro).
+    raiz.classList.add("dark");
   }, [tema]);
 
   function setTema(novo: TemaId) {

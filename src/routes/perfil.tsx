@@ -317,11 +317,12 @@ function ImportarSpotify() {
   const [arrastando, setArrastando] = useState(false);
 
   function enviar(lista: FileList | null) {
-    const arquivos = Array.from(lista ?? []).filter((f) => f.name.endsWith(".json"));
+    const arquivos = Array.from(lista ?? []).filter((f) => /\.(json|zip)$/i.test(f.name));
     if (arquivos.length === 0) {
-      toast.error("Selecione os arquivos .json do histórico.");
+      toast.error("Selecione o .zip do Spotify ou os arquivos .json do histórico.");
       return;
     }
+
     importar.mutate(arquivos, {
       onSuccess: (r) => {
         toast.success(`${r.faixas_novas.toLocaleString("pt-BR")} reproduções importadas.`);
@@ -337,9 +338,12 @@ function ImportarSpotify() {
     <div className="surface-card p-5">
       <h3 className="font-display text-lg font-bold">Importar histórico do Spotify</h3>
       <p className="mb-4 text-xs text-muted-foreground">
-        Peça o “Extended Streaming History” em spotify.com/account/privacy e solte aqui os arquivos{" "}
-        <code>Streaming_History_Audio_*.json</code>. É o único jeito de trazer anos de histórico.
+        Peça o “Extended Streaming History” em spotify.com/account/privacy e solte aqui o{" "}
+        <code>my_spotify_data.zip</code> inteiro (ou os{" "}
+        <code>Streaming_History_Audio_*.json</code> de dentro dele). É o único jeito de trazer anos
+        de histórico — e os gêneros são buscados na API do Spotify durante a importação.
       </p>
+
 
       <div
         onDragOver={(e) => {
@@ -359,17 +363,20 @@ function ImportarSpotify() {
       >
         <Upload className="size-6 text-primary" />
         <p className="text-sm font-medium">
-          {importar.isPending ? "Enviando e processando…" : "Arraste os JSON ou clique para escolher"}
+          {importar.isPending
+            ? "Enviando e processando…"
+            : "Arraste o .zip (ou os .json) ou clique para escolher"}
         </p>
         <p className="text-xs text-muted-foreground">Até 40 arquivos, 60MB cada.</p>
         <input
           ref={inputRef}
           type="file"
-          accept="application/json,.json"
+          accept="application/json,.json,application/zip,.zip"
           multiple
           hidden
           onChange={(e) => enviar(e.target.files)}
         />
+
       </div>
     </div>
   );

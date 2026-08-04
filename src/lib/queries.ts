@@ -24,7 +24,13 @@ export type ComparacaoPlataforma = {
   total_minutos: number;
 };
 
-export type TopArtista = { nome_artista: string; total_reproducoes: number };
+export type TopArtista = {
+  nome_artista: string;
+  total_reproducoes: number;
+  total_minutos?: number;
+  /** Capa mais frequente do artista no histórico — usada como "foto" no ranking. */
+  imagem_url?: string | null;
+};
 
 export type HistoricoMensal = {
   mes: string; // "AAAA-MM"

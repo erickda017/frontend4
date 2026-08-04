@@ -27,15 +27,16 @@ export const Route = createFileRoute("/historico")({
   component: Historico,
 });
 
-const PAGINA = 25;
+const PAGINA = 50;
 
 function Historico() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<string | "all">("all");
   const [visiveis, setVisiveis] = useState(PAGINA);
 
-  // Traz um lote maior aqui na página de histórico (o painel usa só 5)
-  const { data: history = [], isLoading, isError, refetch } = useFaixasRecentes(200);
+  // limite 0 = ILIMITADO: a página de histórico carrega TODAS as reproduções
+  // (o painel continua usando só as últimas 5).
+  const { data: history = [], isLoading, isError, refetch } = useFaixasRecentes(0);
   const { data: platforms = [] } = usePerfilPlataformas();
 
   const results = useMemo(
@@ -171,6 +172,12 @@ function Historico() {
             className="rounded-full bg-secondary px-5 py-2.5 text-sm font-medium text-secondary-foreground transition-colors hover:bg-muted"
           >
             Carregar mais ({results.length - visiveis} restantes)
+          </button>
+          <button
+            onClick={() => setVisiveis(results.length)}
+            className="ml-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Mostrar tudo
           </button>
         </div>
       ) : null}

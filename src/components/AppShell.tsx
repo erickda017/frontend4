@@ -98,9 +98,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <BackendOfflineBanner />
 
-      <main className="mx-auto max-w-6xl px-4 pt-5 pb-28 md:pt-6 md:pb-16">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 pt-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:pt-6 md:pb-16">
+        {children}
+      </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         <div className="mx-auto flex max-w-6xl">
           {nav.map((item) => {
             const Icon = item.icon;
@@ -109,15 +111,16 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={item.to}
                 to={item.to}
                 activeOptions={{ exact: item.to === "/" }}
-                className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] text-muted-foreground transition-colors [&.active]:text-primary"
+                className="flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[10px] leading-tight text-muted-foreground transition-colors [&.active]:text-primary"
               >
-                <Icon className="size-5" />
-                {item.label}
+                <Icon className="size-5 shrink-0" />
+                <span className="w-full truncate px-0.5 text-center">{item.label}</span>
               </Link>
             );
           })}
         </div>
       </nav>
+
     </div>
   );
 }

@@ -220,15 +220,19 @@ function Painel() {
           <ol className="space-y-3">
             {topArtistas.map((a, i) => (
               <li key={a.nome_artista ?? `a-${i}`} className="flex items-center gap-3">
-                <span className="grid size-7 place-items-center rounded-lg bg-secondary text-xs font-bold">
+                <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-secondary text-[11px] font-bold">
                   {i + 1}
                 </span>
+                <FotoArtista nome={a.nome_artista} url={a.imagem_url ?? null} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">
                     {a.nome_artista || "Artista desconhecido"}
                   </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {Number(a.total_minutos) || 0} min
+                  </span>
                 </span>
-                <span className="text-sm text-muted-foreground">
+                <span className="shrink-0 text-sm text-muted-foreground">
                   {Number(a.total_reproducoes) || 0} plays
                 </span>
               </li>
@@ -237,6 +241,7 @@ function Painel() {
               <p className="text-sm text-muted-foreground">Nenhum artista ainda.</p>
             ) : null}
           </ol>
+
         </div>
 
         <div className="surface-card p-5">
@@ -300,5 +305,35 @@ function Painel() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+/** Foto (capa mais frequente) do artista no ranking, com fallback nas iniciais. */
+function FotoArtista({ nome, url }: { nome: string | null; url: string | null }) {
+  const iniciais = (nome || "?")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0]?.toUpperCase())
+    .join("");
+
+  return (
+    <span className="size-10 shrink-0 overflow-hidden rounded-full bg-secondary">
+      {url ? (
+        <img
+          src={url}
+          alt={nome ? `Foto de ${nome}` : "Artista"}
+          loading="lazy"
+          decoding="async"
+          width={80}
+          height={80}
+          className="size-full object-cover"
+        />
+      ) : (
+        <span className="grid size-full place-items-center text-xs font-bold text-muted-foreground">
+          {iniciais}
+        </span>
+      )}
+    </span>
   );
 }
