@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import { useAuth } from "./auth-context";
 
 // ----------------------------------------------------------------------------
@@ -46,10 +46,31 @@ function normalizar(bruto: TocandoAgoraApi | null): TocandoAgora | null {
     progresso_ms: bruto.progresso_ms ?? 0,
     duracao_ms: bruto.duracao_ms ?? 0,
     plataforma_nome: bruto.plataforma_nome ?? "Spotify",
-    plataforma_cor: bruto.plataforma_cor ?? CORES_PLATAFORMA['spotify']!,
+    plataforma_cor: bruto.plataforma_cor ?? CORES_PLATAFORMA["spotify"]!,
   };
 }
 
+const INTERVALO_BASE_MS = 15_000;
+const INTERVALO_MAXIMO_MS = 10 * 60_000; // nunca espera mais que 10min entre tentativas
+
+/**
+ * Corrigido em 2026-08: o widget ficava perguntando "o que está tocando"
+ * a cada 15s pra sempre, sem parar mesmo depois de um erro. Deixado aberto
+ * a noite inteira (ex: música em repeat até de madrugada), isso soma
+ * milhares de chamadas ao endpoint /me/player/currently-playing do Spotify
+ * e estoura o rate limit da API (429) — e, como o polling continuava
+ * batendo a cada 15s mesmo depois do 429, o bloqueio nunca tinha chance de
+ * liberar (e o botão "Sincronizar" manual passava a falhar também, porque é
+ * o mesmo token/rate limit).
+ *
+ * Agora: cada falha CONSECUTIVA dobra o intervalo até um teto de 10min, e se
+ * o backend devolver um 429 com Retry-After, respeita esse tempo
+ * explicitamente. Uma resposta bem-sucedida volta o intervalo pro normal
+ * (15s) — por isso usamos `fetchFailureCount` (zera a cada sucesso) e não
+ * `errorUpdateCount` (esse é cumulativo pra sempre e nunca reseta, o que
+ * deixaria o polling lento pro resto da sessão depois de um único erro
+ * pontual, mesmo já recuperado há horas).
+ */
 export function useTocandoAgora() {
   const { user } = useAuth();
   return useQuery({
@@ -57,11 +78,22 @@ export function useTocandoAgora() {
     queryFn: async () =>
       normalizar(await api.get<TocandoAgoraApi | null>("/api/sync/tocando-agora")),
     enabled: !!user,
-    // Playback muda a todo momento: atualiza sozinho.
-    refetchInterval: 15_000,
     refetchIntervalInBackground: false,
     retry: false,
     staleTime: 5_000,
+    refetchInterval: (query) => {
+      const falhasConsecutivas = query.state.fetchFailureCount;
+      if (falhasConsecutivas === 0) return INTERVALO_BASE_MS;
+
+      const erro = query.state.fetchFailureReason ?? query.state.error;
+      if (erro instanceof ApiError && erro.status === 429 && erro.retryAfter) {
+        return Math.min(erro.retryAfter * 1000, INTERVALO_MAXIMO_MS);
+      }
+
+      // Backoff exponencial pra qualquer outra falha (rede, 500, etc).
+      const backoff = INTERVALO_BASE_MS * 2 ** Math.min(falhasConsecutivas, 5);
+      return Math.min(backoff, INTERVALO_MAXIMO_MS);
+    },
   });
 }
 

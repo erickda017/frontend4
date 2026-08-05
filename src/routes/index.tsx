@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Area,
@@ -21,6 +22,7 @@ import { SonicHero } from "@/components/SonicHero";
 import { StatCard } from "@/components/StatCard";
 import { TempoEscutaCard } from "@/components/TempoEscutaCard";
 import {
+  type PeriodoResumo,
   useComparacaoPlataformas,
   useFaixasRecentes,
   useGeneros,
@@ -77,6 +79,8 @@ function formatarQuando(valor: string | null | undefined) {
 
 function Painel() {
   const { data: resumo, isLoading: carregandoResumo } = useResumo();
+  const [periodoTempo, setPeriodoTempo] = useState<PeriodoResumo>("total");
+  const { data: resumoTempo, isLoading: carregandoResumoTempo } = useResumo(periodoTempo);
   const { data: historicoMensal = [] } = useHistoricoMensal(8);
   const { data: topArtistas = [] } = useTopArtistas(5);
   const { data: recentes = [] } = useFaixasRecentes(5);
@@ -90,12 +94,13 @@ function Painel() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <TempoEscutaCard
-          totalMinutos={resumo?.totalMinutos}
-          carregando={carregandoResumo}
+          totalMinutos={resumoTempo?.totalMinutos}
+          carregando={carregandoResumoTempo}
           label="Tempo ouvido"
+          periodo={periodoTempo}
+          onPeriodoChange={setPeriodoTempo}
         />
         <StatCard
-
           label="Reproduções"
           value={carregandoResumo ? "…" : (resumo?.totalFaixas ?? 0).toLocaleString("pt-BR")}
           hint="todas as plataformas"
@@ -115,10 +120,12 @@ function Painel() {
         />
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <div className="surface-card p-5 lg:col-span-2">
+      <div className="mt-6 grid min-w-0 gap-4 lg:grid-cols-3">
+        <div className="surface-card min-w-0 p-5 lg:col-span-2">
           <h2 className="text-lg font-semibold">Minutos por mês</h2>
-          <p className="mb-4 text-xs text-muted-foreground">Últimos 8 meses (total, todas as plataformas)</p>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Últimos 8 meses (total, todas as plataformas)
+          </p>
           <ChartFrame className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={historicoMensal}>
@@ -151,7 +158,9 @@ function Painel() {
 
         <div className="surface-card p-5">
           <h2 className="text-lg font-semibold">Divisão por gênero</h2>
-          <p className="mb-2 text-xs text-muted-foreground">Classificado automaticamente por faixa</p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Classificado automaticamente por faixa
+          </p>
           <ChartFrame className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -193,15 +202,22 @@ function Painel() {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <div className="surface-card p-5">
+      <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-3">
+        <div className="surface-card min-w-0 p-5">
           <h2 className="text-lg font-semibold">Quando você ouve</h2>
-          <p className="mb-4 text-xs text-muted-foreground">Reproduções por hora do dia (fuso local)</p>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Reproduções por hora do dia (fuso local)
+          </p>
           <ChartFrame className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={porHora}>
                 <CartesianGrid stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="rotulo" stroke="var(--muted-foreground)" fontSize={10} interval={2} />
+                <XAxis
+                  dataKey="rotulo"
+                  stroke="var(--muted-foreground)"
+                  fontSize={10}
+                  interval={2}
+                />
                 <Tooltip {...chartTooltip} cursor={{ fill: "var(--muted)" }} />
                 <Bar
                   dataKey="total_faixas"
@@ -241,7 +257,6 @@ function Painel() {
               <p className="text-sm text-muted-foreground">Nenhum artista ainda.</p>
             ) : null}
           </ol>
-
         </div>
 
         <div className="surface-card p-5">

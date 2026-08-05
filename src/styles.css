@@ -89,6 +89,26 @@
     border-color: var(--color-border);
   }
 
+  /* Fix (2026-08): sem isso, qualquer elemento que acidentalmente fique um
+     pouco mais largo que a tela (um gráfico, uma badge, etc) cria scroll
+     horizontal no documento inteiro. Em navegadores mobile isso faz
+     elementos com position:fixed (a barra de navegação inferior, balões,
+     etc) "vazarem"/deslizarem pra direita quando o layout viewport alarga —
+     exatamente o bug relatado de a barra inferior crescer e sumir pra
+     direita ao trocar de aba. overflow-x:hidden no html/body/#root barra
+     esse overflow na raiz, então nem chega a acontecer. */
+  html,
+  body {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    max-width: 100vw;
+  }
+
+  #root {
+    overflow-x: hidden;
+    width: 100%;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);

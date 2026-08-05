@@ -4,7 +4,9 @@ import {
   Check,
   Clock,
   Disc3,
+  Download,
   Music4,
+  Sparkles,
   Trophy,
   Upload,
   UserPlus,
@@ -19,13 +21,16 @@ import { EmptyState, SkeletonCards } from "@/components/States";
 import { StatCard } from "@/components/StatCard";
 import { TempoEscutaCard } from "@/components/TempoEscutaCard";
 import {
+  type PeriodoResumo,
   useAceitarAmigo,
   useAmigos,
   useConvidarAmigo,
+  useExportarHistorico,
   useGeneros,
   useImportarHistoricoSpotify,
   usePerfil,
   usePorHora,
+  useRankingAmigos,
   useRemoverAmigo,
   useSalvarPerfil,
 } from "@/lib/queries";
@@ -62,6 +67,7 @@ function formatarData(valor: string | null) {
 
 function PerfilPage() {
   const { data: perfil, isLoading } = usePerfil();
+  const exportar = useExportarHistorico();
 
   return (
     <AppShell>
@@ -72,6 +78,26 @@ function PerfilPage() {
 
       {isLoading ? <SkeletonCards /> : <CartaoPerfil />}
 
+      <div className="surface-card mt-6 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+            <Sparkles className="size-5" />
+          </span>
+          <div>
+            <p className="font-semibold">Seu Wrapped</p>
+            <p className="text-xs text-muted-foreground">
+              O resumo do seu ano musical: artista, faixa e gênero favoritos, e mais.
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/wrapped"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
+        >
+          Ver meu Wrapped
+        </Link>
+      </div>
+
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <GenerosCard />
         <HorasCard />
@@ -80,6 +106,40 @@ function PerfilPage() {
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <ImportarSpotify />
         <Amigos />
+      </div>
+
+      <div className="surface-card mt-6 p-5">
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
+            <Download className="size-5" />
+          </span>
+          <div>
+            <p className="font-semibold">Exportar histórico</p>
+            <p className="text-xs text-muted-foreground">
+              Baixe todas as suas reproduções registradas no Sonora.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={() =>
+              exportar.mutate("csv", { onError: (e: Error) => toast.error(e.message) })
+            }
+            disabled={exportar.isPending}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium disabled:opacity-60"
+          >
+            Baixar .csv
+          </button>
+          <button
+            onClick={() =>
+              exportar.mutate("json", { onError: (e: Error) => toast.error(e.message) })
+            }
+            disabled={exportar.isPending}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium disabled:opacity-60"
+          >
+            Baixar .json
+          </button>
+        </div>
       </div>
 
       {perfil ? (
@@ -229,13 +289,16 @@ function CartaoPerfil() {
           icon={Music4}
         />
         <TempoEscutaCard totalMinutos={perfil.resumo?.totalMinutos} />
-        <StatCard label="Artistas" value={String(perfil.resumo?.artistasUnicos ?? 0)} icon={Disc3} />
+        <StatCard
+          label="Artistas"
+          value={String(perfil.resumo?.artistasUnicos ?? 0)}
+          icon={Disc3}
+        />
         <StatCard label="Conquistas" value={String(perfil.total_conquistas ?? 0)} icon={Trophy} />
       </div>
     </>
   );
 }
-
 
 function GenerosCard() {
   const { data = [], isLoading } = useGeneros(8);
@@ -291,7 +354,11 @@ function HorasCard() {
       ) : (
         <div className="flex h-40 items-end gap-[3px]">
           {data.map((h) => (
-            <div key={h.hora} className="group relative flex-1" title={`${h.rotulo} — ${h.total_faixas} faixas`}>
+            <div
+              key={h.hora}
+              className="group relative flex-1"
+              title={`${h.rotulo} — ${h.total_faixas} faixas`}
+            >
               <div
                 className="w-full rounded-t bg-primary/70 transition-all group-hover:bg-primary"
                 style={{ height: `${Math.max(3, (h.total_faixas / maximo) * 140)}px` }}
@@ -327,7 +394,9 @@ function ImportarSpotify() {
       onSuccess: (r) => {
         toast.success(`${r.faixas_novas.toLocaleString("pt-BR")} reproduções importadas.`);
         if (r.conquistas_desbloqueadas?.length) {
-          toast.success(`Novas conquistas: ${r.conquistas_desbloqueadas.map((c) => c.titulo).join(", ")}`);
+          toast.success(
+            `Novas conquistas: ${r.conquistas_desbloqueadas.map((c) => c.titulo).join(", ")}`,
+          );
         }
       },
       onError: (err: Error) => toast.error(err.message),
@@ -339,11 +408,10 @@ function ImportarSpotify() {
       <h3 className="font-display text-lg font-bold">Importar histórico do Spotify</h3>
       <p className="mb-4 text-xs text-muted-foreground">
         Peça o “Extended Streaming History” em spotify.com/account/privacy e solte aqui o{" "}
-        <code>my_spotify_data.zip</code> inteiro (ou os{" "}
-        <code>Streaming_History_Audio_*.json</code> de dentro dele). É o único jeito de trazer anos
-        de histórico — e os gêneros são buscados na API do Spotify durante a importação.
+        <code>my_spotify_data.zip</code> inteiro (ou os <code>Streaming_History_Audio_*.json</code>{" "}
+        de dentro dele). É o único jeito de trazer anos de histórico — e os gêneros são buscados na
+        API do Spotify durante a importação.
       </p>
-
 
       <div
         onDragOver={(e) => {
@@ -376,7 +444,6 @@ function ImportarSpotify() {
           hidden
           onChange={(e) => enviar(e.target.files)}
         />
-
       </div>
     </div>
   );
@@ -393,131 +460,205 @@ function Amigos() {
   const pendentes = amigos.filter((a) => a.status === "pendente");
 
   return (
-    <div className="surface-card p-5">
-      <h3 className="font-display text-lg font-bold">Amigos</h3>
-      <p className="mb-4 text-xs text-muted-foreground">
-        Adicione pelo e-mail da conta Sonora e compare gostos, histórico e tempo ouvido.
-      </p>
+    <>
+      {aceitos.length > 0 ? <RankingAmigos /> : null}
+      <div className="surface-card p-5">
+        <h3 className="font-display text-lg font-bold">Amigos</h3>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Adicione pelo e-mail da conta Sonora e compare gostos, histórico e tempo ouvido.
+        </p>
 
-      <form
-        className="mb-4 flex flex-col gap-2 sm:flex-row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!email.trim()) return;
-          convidar.mutate(email.trim(), {
-            onSuccess: () => {
-              toast.success("Convite enviado!");
-              setEmail("");
-            },
-            onError: (err: Error) => toast.error(err.message),
-          });
-        }}
-      >
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="email@do.amigo"
-          className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
-        />
-        <button
-          type="submit"
-          disabled={convidar.isPending}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+        <form
+          className="mb-4 flex flex-col gap-2 sm:flex-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!email.trim()) return;
+            convidar.mutate(email.trim(), {
+              onSuccess: () => {
+                toast.success("Convite enviado!");
+                setEmail("");
+              },
+              onError: (err: Error) => toast.error(err.message),
+            });
+          }}
         >
-          <UserPlus className="size-4" />
-          Convidar
-        </button>
-      </form>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="email@do.amigo"
+            className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+          <button
+            type="submit"
+            disabled={convidar.isPending}
+            className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          >
+            <UserPlus className="size-4" />
+            Convidar
+          </button>
+        </form>
 
-      {isLoading ? (
-        <SkeletonCards />
-      ) : amigos.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="Nenhum amigo ainda"
-          description="Convide alguém pelo e-mail para comparar gostos musicais."
-        />
-      ) : (
-        <div className="space-y-4">
-          {pendentes.length > 0 ? (
-            <div>
-              <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Convites
-              </p>
+        {isLoading ? (
+          <SkeletonCards />
+        ) : amigos.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Nenhum amigo ainda"
+            description="Convide alguém pelo e-mail para comparar gostos musicais."
+          />
+        ) : (
+          <div className="space-y-4">
+            {pendentes.length > 0 ? (
+              <div>
+                <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Convites
+                </p>
+                <ul className="space-y-2">
+                  {pendentes.map((a) => (
+                    <li
+                      key={a.id}
+                      className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2 text-sm"
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {a.amigo_nome}
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          {a.eu_enviei ? "· aguardando resposta" : "· quer te adicionar"}
+                        </span>
+                      </span>
+                      {!a.eu_enviei ? (
+                        <button
+                          onClick={() => aceitar.mutate(a.id)}
+                          className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground"
+                          title="Aceitar"
+                        >
+                          <Check className="size-4" />
+                        </button>
+                      ) : null}
+                      <button
+                        onClick={() => remover.mutate(a.id)}
+                        className="grid size-8 place-items-center rounded-lg bg-muted text-muted-foreground hover:text-destructive"
+                        title="Remover"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {aceitos.length > 0 ? (
               <ul className="space-y-2">
-                {pendentes.map((a) => (
+                {aceitos.map((a) => (
                   <li
                     key={a.id}
                     className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2 text-sm"
                   >
-                    <span className="min-w-0 flex-1 truncate">
-                      {a.amigo_nome}
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        {a.eu_enviei ? "· aguardando resposta" : "· quer te adicionar"}
-                      </span>
+                    <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted text-xs font-bold">
+                      {a.amigo_avatar_url ? (
+                        <img
+                          src={a.amigo_avatar_url}
+                          alt={a.amigo_nome}
+                          loading="lazy"
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        a.amigo_nome.slice(0, 2).toUpperCase()
+                      )}
                     </span>
-                    {!a.eu_enviei ? (
-                      <button
-                        onClick={() => aceitar.mutate(a.id)}
-                        className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground"
-                        title="Aceitar"
-                      >
-                        <Check className="size-4" />
-                      </button>
-                    ) : null}
+                    <span className="min-w-0 flex-1 truncate font-medium">{a.amigo_nome}</span>
+                    <Link
+                      to="/amigos/$amigoId"
+                      params={{ amigoId: a.amigo_id }}
+                      className="rounded-lg bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/25"
+                    >
+                      Comparar
+                    </Link>
                     <button
                       onClick={() => remover.mutate(a.id)}
-                      className="grid size-8 place-items-center rounded-lg bg-muted text-muted-foreground hover:text-destructive"
-                      title="Remover"
+                      className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-destructive"
+                      title="Desfazer amizade"
                     >
                       <X className="size-4" />
                     </button>
                   </li>
                 ))}
               </ul>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
 
-          {aceitos.length > 0 ? (
-            <ul className="space-y-2">
-              {aceitos.map((a) => (
-                <li
-                  key={a.id}
-                  className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2 text-sm"
-                >
-                  <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted text-xs font-bold">
-                    {a.amigo_avatar_url ? (
-                      <img
-                        src={a.amigo_avatar_url}
-                        alt={a.amigo_nome}
-                        loading="lazy"
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      a.amigo_nome.slice(0, 2).toUpperCase()
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{a.amigo_nome}</span>
-                  <Link
-                    to="/amigos/$amigoId"
-                    params={{ amigoId: a.amigo_id }}
-                    className="rounded-lg bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/25"
-                  >
-                    Comparar
-                  </Link>
-                  <button
-                    onClick={() => remover.mutate(a.id)}
-                    className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:text-destructive"
-                    title="Desfazer amizade"
-                  >
-                    <X className="size-4" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+/** Ranking entre você e seus amigos aceitos, com o mesmo seletor de período
+ *  (todo período / semana / mês) usado no card "Tempo ouvido". */
+function RankingAmigos() {
+  const [periodo, setPeriodo] = useState<PeriodoResumo>("total");
+  const { data: ranking = [], isLoading } = useRankingAmigos(periodo);
+
+  const rotuloPeriodo: Record<PeriodoResumo, string> = {
+    total: "Todo período",
+    semana: "Última semana",
+    mes: "Mês",
+  };
+
+  return (
+    <div className="surface-card mb-4 p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-display text-lg font-bold">Ranking com amigos</h3>
+        <div className="flex gap-1">
+          {(["total", "semana", "mes"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPeriodo(p)}
+              className={`rounded-full border px-2 py-1 text-[10px] font-medium transition-colors ${
+                periodo === p
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {rotuloPeriodo[p]}
+            </button>
+          ))}
         </div>
+      </div>
+
+      {isLoading ? (
+        <SkeletonCards count={3} />
+      ) : (
+        <ol className="space-y-2">
+          {ranking.map((r, i) => (
+            <li
+              key={r.usuario_id}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm ${
+                r.eu ? "bg-primary/10" : "bg-surface-2"
+              }`}
+            >
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                {i + 1}
+              </span>
+              {r.avatar_url ? (
+                <img
+                  src={r.avatar_url}
+                  alt={r.nome}
+                  className="size-8 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/20 text-xs font-semibold text-primary">
+                  {r.nome.slice(0, 2).toUpperCase()}
+                </span>
+              )}
+              <span className="min-w-0 flex-1 truncate font-medium">{r.eu ? "Você" : r.nome}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {r.total_minutos.toLocaleString("pt-BR")} min
+              </span>
+            </li>
+          ))}
+        </ol>
       )}
     </div>
   );

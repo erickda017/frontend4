@@ -3,13 +3,18 @@ import { supabase } from "./supabase";
 // Aponta pro backend Node (Projeto B). Em dev, o Node roda em localhost:3000
 // por padrão (ver PORT em projB/.env). Configure em .env do front:
 //   VITE_API_URL=http://localhost:3000
-export const API_URL = (import.meta.env['VITE_API_URL'] as string | undefined) ?? "http://localhost:3000";
+export const API_URL =
+  (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:3000";
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** Segundos que a API pediu pra esperar antes de tentar de novo (header
+   *  Retry-After, presente nos 429 de rate limit do Spotify). */
+  retryAfter: number | null;
+  constructor(status: number, message: string, retryAfter: number | null = null) {
     super(message);
     this.status = status;
+    this.retryAfter = retryAfter;
     this.name = "ApiError";
   }
 }
@@ -36,7 +41,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const message = body?.erro || `Erro ${res.status} ao chamar ${path}`;
-    throw new ApiError(res.status, message);
+    const retryAfterHeader = res.headers.get("Retry-After");
+    const retryAfter = retryAfterHeader ? Number(retryAfterHeader) : null;
+    throw new ApiError(res.status, message, Number.isFinite(retryAfter) ? retryAfter : null);
   }
 
   return body as T;
@@ -71,5 +78,27 @@ export const api = {
     }
     return body as T;
   },
+  /**
+   * Baixa um arquivo (usado na exportação CSV/JSON do histórico). Precisa
+   * ser um fetch separado do `get` porque a resposta não é JSON e o backend
+   * manda o nome do arquivo via Content-Disposition — o browser só respeita
+   * esse header dentro de um download disparado via <a download>, então
+   * criamos o link temporário aqui.
+   */
+  download: async (path: string, nomeArquivoPadrao: string): Promise<void> => {
+    const res = await fetch(`${API_URL}${path}`, { headers: await authHeader() });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError(res.status, body?.erro || `Erro ${res.status} ao baixar ${path}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nomeArquivoPadrao;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  },
 };
-

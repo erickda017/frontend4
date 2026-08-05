@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MetasRouteImport } from './routes/metas'
 import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as PlataformasRouteImport } from './routes/plataformas'
+import { Route as WrappedRouteImport } from './routes/wrapped'
 import { Route as AmigosAmigoIdRouteImport } from './routes/amigos.$amigoId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -53,6 +54,11 @@ const PlataformasRoute = PlataformasRouteImport.update({
   path: '/plataformas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WrappedRoute = WrappedRouteImport.update({
+  id: '/wrapped',
+  path: '/wrapped',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AmigosAmigoIdRoute = AmigosAmigoIdRouteImport.update({
   id: '/amigos/$amigoId',
   path: '/amigos/$amigoId',
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/metas': typeof MetasRoute
   '/perfil': typeof PerfilRoute
   '/plataformas': typeof PlataformasRoute
+  '/wrapped': typeof WrappedRoute
   '/amigos/$amigoId': typeof AmigosAmigoIdRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/metas': typeof MetasRoute
   '/perfil': typeof PerfilRoute
   '/plataformas': typeof PlataformasRoute
+  '/wrapped': typeof WrappedRoute
   '/amigos/$amigoId': typeof AmigosAmigoIdRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/metas': typeof MetasRoute
   '/perfil': typeof PerfilRoute
   '/plataformas': typeof PlataformasRoute
+  '/wrapped': typeof WrappedRoute
   '/amigos/$amigoId': typeof AmigosAmigoIdRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/metas'
     | '/perfil'
     | '/plataformas'
+    | '/wrapped'
     | '/amigos/$amigoId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/metas'
     | '/perfil'
     | '/plataformas'
+    | '/wrapped'
     | '/amigos/$amigoId'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/metas'
     | '/perfil'
     | '/plataformas'
+    | '/wrapped'
     | '/amigos/$amigoId'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   MetasRoute: typeof MetasRoute
   PerfilRoute: typeof PerfilRoute
   PlataformasRoute: typeof PlataformasRoute
+  WrappedRoute: typeof WrappedRoute
   AmigosAmigoIdRoute: typeof AmigosAmigoIdRoute
 }
 
@@ -185,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlataformasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/wrapped': {
+      id: '/wrapped'
+      path: '/wrapped'
+      fullPath: '/wrapped'
+      preLoaderRoute: typeof WrappedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/amigos/$amigoId': {
       id: '/amigos/$amigoId'
       path: '/amigos/$amigoId'
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   MetasRoute: MetasRoute,
   PerfilRoute: PerfilRoute,
   PlataformasRoute: PlataformasRoute,
+  WrappedRoute: WrappedRoute,
   AmigosAmigoIdRoute: AmigosAmigoIdRoute,
 }
 export const routeTree = rootRouteImport

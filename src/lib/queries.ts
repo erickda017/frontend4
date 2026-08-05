@@ -65,6 +65,7 @@ export type ConquistaDesbloqueada = {
   titulo: string;
   descricao: string | null;
   desbloqueada_em: string;
+  raridade?: string;
 };
 
 export type PlataformaPerfil = {
@@ -74,6 +75,7 @@ export type PlataformaPerfil = {
   cor_tema: string | null;
   ativa: boolean;
   conectada: boolean;
+  ultima_sincronizacao_em: string | null;
 };
 
 export type FaixaRecente = {
@@ -94,11 +96,36 @@ export type FaixaRecente = {
 // mostrar também as que ainda estão bloqueadas. Se a lista mudar no backend,
 // atualize aqui também.
 export const CATALOGO_CONQUISTAS = [
-  { chave: "primeira_musica", titulo: "Primeiro Play", descricao: "Você conectou uma plataforma e sincronizou sua primeira música!" },
-  { chave: "cem_faixas", titulo: "Maratonista Musical", descricao: "Você já ouviu 100 faixas registradas no Music Hub." },
-  { chave: "mil_faixas", titulo: "Mil e Uma Músicas", descricao: "Uau! 1.000 faixas no seu histórico." },
-  { chave: "dez_artistas", titulo: "Explorador Sonoro", descricao: "Você já ouviu pelo menos 10 artistas diferentes." },
-  { chave: "cem_horas", titulo: "Cem Horas de Som", descricao: "Mais de 6.000 minutos (100 horas) de música ouvida." },
+  {
+    chave: "primeira_musica",
+    titulo: "Primeiro Play",
+    descricao: "Você conectou uma plataforma e sincronizou sua primeira música!",
+    raridade: "comum",
+  },
+  {
+    chave: "cem_faixas",
+    titulo: "Maratonista Musical",
+    descricao: "Você já ouviu 100 faixas registradas no Music Hub.",
+    raridade: "comum",
+  },
+  {
+    chave: "mil_faixas",
+    titulo: "Mil e Uma Músicas",
+    descricao: "Uau! 1.000 faixas no seu histórico.",
+    raridade: "rara",
+  },
+  {
+    chave: "dez_artistas",
+    titulo: "Explorador Sonoro",
+    descricao: "Você já ouviu pelo menos 10 artistas diferentes.",
+    raridade: "comum",
+  },
+  {
+    chave: "cem_horas",
+    titulo: "Cem Horas de Som",
+    descricao: "Mais de 6.000 minutos (100 horas) de música ouvida.",
+    raridade: "epica",
+  },
 ] as const;
 
 // ----------------------------------------------------------------------------
@@ -106,11 +133,14 @@ export const CATALOGO_CONQUISTAS = [
 // backend exigem Authorization: Bearer <token>, ver middleware/auth.js)
 // ----------------------------------------------------------------------------
 
-export function useResumo() {
+export type PeriodoResumo = "total" | "semana" | "mes";
+
+export function useResumo(periodo: PeriodoResumo = "total") {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ["resumo"],
-    queryFn: () => api.get<Resumo>("/api/stats/resumo"),
+    queryKey: ["resumo", periodo],
+    queryFn: () =>
+      api.get<Resumo>(`/api/stats/resumo${periodo !== "total" ? `?periodo=${periodo}` : ""}`),
     enabled: !!user,
   });
 }
@@ -219,8 +249,7 @@ export function useConquistasDinamicasPreview() {
   const { user } = useAuth();
   return useQuery({
     queryKey: ["conquistas-dinamicas-preview"],
-    queryFn: () =>
-      api.get<ConquistaDinamicaPreview[]>("/api/perfil/conquistas-dinamicas-preview"),
+    queryFn: () => api.get<ConquistaDinamicaPreview[]>("/api/perfil/conquistas-dinamicas-preview"),
     enabled: !!user,
   });
 }
@@ -383,11 +412,7 @@ export function usePerfil() {
 export function useSalvarPerfil() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (dados: {
-      nome_exibicao?: string;
-      avatar_url?: string;
-      banner_url?: string;
-    }) =>
+    mutationFn: (dados: { nome_exibicao?: string; avatar_url?: string; banner_url?: string }) =>
       api.put<unknown>("/api/perfil", dados),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["perfil"] }),
   });
@@ -495,5 +520,61 @@ export function useComparacaoAmigo(amigoId: string) {
     queryKey: ["comparacao-amigo", amigoId],
     queryFn: () => api.get<Comparacao>(`/api/amigos/${amigoId}/comparacao`),
     enabled: !!user && !!amigoId,
+  });
+}
+
+export type RankingAmigo = {
+  usuario_id: string;
+  eu: boolean;
+  nome: string;
+  avatar_url: string | null;
+  total_minutos: number;
+  total_faixas: number;
+};
+
+export function useRankingAmigos(periodo: PeriodoResumo = "total") {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["ranking-amigos", periodo],
+    queryFn: () =>
+      api.get<RankingAmigo[]>(
+        `/api/amigos/ranking${periodo !== "total" ? `?periodo=${periodo}` : ""}`,
+      ),
+    enabled: !!user,
+  });
+}
+
+export function useExportarHistorico() {
+  return useMutation({
+    mutationFn: (formato: "csv" | "json") =>
+      api.download(`/api/stats/exportar?formato=${formato}`, `sonora-historico.${formato}`),
+  });
+}
+
+export type Wrapped = {
+  ano: number;
+  tem_dados: boolean;
+  total_faixas?: number;
+  total_minutos?: number;
+  total_minutos_ano_anterior?: number | null;
+  artistas_unicos?: number;
+  top_artistas?: { nome: string; total_faixas: number; imagem_url: string | null }[];
+  top_faixas?: {
+    nome_faixa: string;
+    nome_artista: string;
+    imagem_url: string | null;
+    total_plays: number;
+  }[];
+  top_generos?: { genero: string; total_faixas: number }[];
+  dia_favorito?: string;
+  hora_favorita?: string;
+};
+
+export function useWrapped(ano: number) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["wrapped", ano],
+    queryFn: () => api.get<Wrapped>(`/api/stats/wrapped?ano=${ano}`),
+    enabled: !!user,
   });
 }

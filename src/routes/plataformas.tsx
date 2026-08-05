@@ -17,6 +17,7 @@ import { ChartFrame } from "@/components/ChartFrame";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { EmptyState, SkeletonCards } from "@/components/States";
 import { useAuth } from "@/lib/auth-context";
+import { ApiError } from "@/lib/api";
 import {
   iniciarConexaoOAuth,
   useComparacaoPlataformas,
@@ -29,8 +30,8 @@ type BuscaPlataformas = { conectado?: string | undefined; erro?: string | undefi
 
 export const Route = createFileRoute("/plataformas")({
   validateSearch: (search: Record<string, unknown>): BuscaPlataformas => ({
-    conectado: typeof search['conectado'] === "string" ? search['conectado'] : undefined,
-    erro: typeof search['erro'] === "string" ? search['erro'] : undefined,
+    conectado: typeof search["conectado"] === "string" ? search["conectado"] : undefined,
+    erro: typeof search["erro"] === "string" ? search["erro"] : undefined,
   }),
   head: () => ({
     meta: [
@@ -56,6 +57,23 @@ const MENSAGENS_ERRO: Record<string, string> = {
   spotify_negado: "Você cancelou a autorização no Spotify.",
   falha_conexao: "Não consegui salvar a conexão. Tente conectar de novo.",
 };
+
+/** "há 2min" / "há 3h" / "nunca sincronizado ainda" — usado no card de cada
+ *  plataforma pra deixar visível que o auto-sync (rodando no servidor a cada
+ *  3min, ver backend/src/services/schedulerService.js) está funcionando de
+ *  verdade, não só o clique manual em "Sincronizar". */
+function formatarUltimaSincronizacao(iso: string | null): string {
+  if (!iso)
+    return "Ainda não sincronizado — clique em Sincronizar ou aguarde o próximo ciclo automático.";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60_000);
+  if (min < 1) return "Sincronizado agora mesmo";
+  if (min < 60) return `Última sincronização: há ${min}min`;
+  const horas = Math.floor(min / 60);
+  if (horas < 24) return `Última sincronização: há ${horas}h`;
+  const dias = Math.floor(horas / 24);
+  return `Última sincronização: há ${dias}d`;
+}
 
 function Plataformas() {
   const { user } = useAuth();
@@ -94,7 +112,14 @@ function Plataformas() {
         );
         r.conquistas_desbloqueadas?.forEach((c) => toast(`🏆 Conquista: ${c.titulo}`));
       },
-      onError: (e: Error) => toast.error(e.message),
+      onError: (e: Error) => {
+        if (e instanceof ApiError && e.status === 429) {
+          const espera = e.retryAfter ? `${e.retryAfter}s` : "alguns instantes";
+          toast.error(`O Spotify limitou as requisições. Tente de novo em ${espera}.`);
+          return;
+        }
+        toast.error(e.message);
+      },
     });
   }
 
@@ -109,7 +134,7 @@ function Plataformas() {
     <AppShell>
       <PageHeader
         title="Plataformas"
-        subtitle="Conecte seus serviços e compare o uso de cada um."
+        subtitle="Conecte seus serviços e compare o uso de cada um. Sincronização automática a cada poucos minutos — o botão é só pra forçar na hora."
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -164,34 +189,39 @@ function Plataformas() {
               </dl>
 
               {p.conectada ? (
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => handleSync(p.chave, p.nome_exibicao)}
-                    disabled={sincronizandoEssa}
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground disabled:opacity-60"
-                  >
-                    {sincronizandoEssa ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="size-3.5" />
-                    )}
-                    Sincronizar
-                  </button>
-                  <button
-                    onClick={() => handleDisconnect(p.chave, p.nome_exibicao)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-destructive"
-                  >
-                    <Unplug className="size-3.5" />
-                    Desconectar
-                  </button>
-                </div>
+                <>
+                  <p className="mt-3 text-[11px] text-muted-foreground">
+                    {formatarUltimaSincronizacao(p.ultima_sincronizacao_em)}
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => handleSync(p.chave, p.nome_exibicao)}
+                      disabled={sincronizandoEssa}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground disabled:opacity-60"
+                    >
+                      {sincronizandoEssa ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="size-3.5" />
+                      )}
+                      Sincronizar
+                    </button>
+                    <button
+                      onClick={() => handleDisconnect(p.chave, p.nome_exibicao)}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-destructive"
+                    >
+                      <Unplug className="size-3.5" />
+                      Desconectar
+                    </button>
+                  </div>
+                </>
               ) : null}
             </div>
           );
         })}
       </div>
 
-      <div className="surface-card mt-4 p-5">
+      <div className="surface-card mt-4 min-w-0 p-5">
         <h2 className="text-lg font-semibold">Minutos por plataforma</h2>
         <p className="mb-4 text-xs text-muted-foreground">Total acumulado</p>
         {chartData.length === 0 ? (
