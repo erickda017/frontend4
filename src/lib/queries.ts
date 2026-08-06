@@ -516,6 +516,37 @@ export function useImportarHistoricoSpotify() {
   });
 }
 
+/**
+ * Importa o "youtube_music_historico.json" gerado pelo script
+ * scripts/exportar_youtube_music.py (lib "ytmusicapi", não oficial — ver
+ * comentário em backend/src/services/youtubeMusicService.js). Mesmo padrão
+ * de invalidação do useImportarHistoricoSpotify, já que os dois caem na
+ * mesma tabela "plays" e afetam as mesmas telas.
+ */
+export function useImportarHistoricoYoutubeMusic() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (arquivos: File[]) =>
+      api.upload<ResultadoImportacao>("/api/sync/historico-completo-youtube-music", arquivos),
+    onSuccess: () => {
+      for (const key of [
+        "resumo",
+        "recentes",
+        "top-artistas",
+        "historico-mensal",
+        "comparacao-plataformas",
+        "conquistas",
+        "metas-progresso",
+        "generos",
+        "por-hora",
+        "perfil",
+      ]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
+  });
+}
+
 export type ResultadoPreencherCapas = {
   sucesso: boolean;
   capas_atualizadas: number;
@@ -562,6 +593,35 @@ export function useApagarHistorico() {
       // Zera tudo que é calculado a partir do histórico — praticamente todo
       // dado da tela, então invalida geral em vez de listar chave por chave.
       queryClient.invalidateQueries();
+    },
+  });
+}
+
+/**
+ * Reimporta o .json exportado pelo próprio Sonora (ver "Exportar histórico"
+ * no perfil) — restauração de backup, não o export bruto da Spotify/YouTube
+ * Music. Mesmo padrão de invalidação dos outros imports.
+ */
+export function useImportarBackupProprio() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (arquivo: File) =>
+      api.uploadUnico<ResultadoImportacao>("/api/sync/importar-backup", arquivo),
+    onSuccess: () => {
+      for (const key of [
+        "resumo",
+        "recentes",
+        "top-artistas",
+        "historico-mensal",
+        "comparacao-plataformas",
+        "conquistas",
+        "metas-progresso",
+        "generos",
+        "por-hora",
+        "perfil",
+      ]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
     },
   });
 }

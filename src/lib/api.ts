@@ -80,6 +80,28 @@ export const api = {
     return body as T;
   },
   /**
+   * Upload de UM único arquivo, campo "arquivo" (singular) — usado na
+   * restauração do backup próprio (ver backend/src/routes/syncRoutes.js,
+   * upload.single('arquivo')). Separado de `upload` porque aquele manda
+   * vários arquivos no campo "arquivos" (plural).
+   */
+  uploadUnico: async <T>(path: string, arquivo: File): Promise<T> => {
+    const form = new FormData();
+    form.append("arquivo", arquivo);
+
+    const res = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      headers: await authHeader(),
+      body: form,
+    });
+
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new ApiError(res.status, body?.erro || `Erro ${res.status} ao enviar arquivo`);
+    }
+    return body as T;
+  },
+  /**
    * Baixa um arquivo (usado na exportação CSV/JSON do histórico). Precisa
    * ser um fetch separado do `get` porque a resposta não é JSON e o backend
    * manda o nome do arquivo via Content-Disposition — o browser só respeita

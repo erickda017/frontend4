@@ -28,7 +28,9 @@ import {
   useExportarHistorico,
   useGeneros,
   useApagarHistorico,
+  useImportarBackupProprio,
   useImportarHistoricoSpotify,
+  useImportarHistoricoYoutubeMusic,
   usePerfil,
   usePorHora,
   usePreencherCapasFaltantes,
@@ -107,6 +109,10 @@ function PerfilPage() {
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <ImportarSpotify />
+        <ImportarYoutubeMusic />
+      </div>
+
+      <div className="mt-6">
         <Amigos />
       </div>
 
@@ -142,6 +148,8 @@ function PerfilPage() {
             Baixar .json
           </button>
         </div>
+
+        <RestaurarBackup />
       </div>
 
       {perfil ? (
@@ -475,6 +483,55 @@ function HorasCard() {
   );
 }
 
+/**
+ * Contra-parte de "Exportar histórico": reimporta o .json que o próprio
+ * Sonora gerou. Só aceita .json de propósito (o backend recusa .csv — ver
+ * comentário em syncService.importarBackupProprio). Fica dentro do mesmo
+ * card do export porque é a ação inversa dela.
+ */
+function RestaurarBackup() {
+  const importar = useImportarBackupProprio();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function enviar(lista: FileList | null) {
+    const arquivo = lista?.[0];
+    if (!arquivo || !/\.json$/i.test(arquivo.name)) {
+      toast.error("Selecione o .json exportado pelo próprio Sonora.");
+      return;
+    }
+
+    importar.mutate(arquivo, {
+      onSuccess: (r) => {
+        toast.success(`${r.faixas_novas.toLocaleString("pt-BR")} reproduções restauradas.`);
+        if (r.linhas_ignoradas) {
+          toast.warning(`${r.linhas_ignoradas} linhas ignoradas (formato inválido).`);
+        }
+      },
+      onError: (err: Error) => toast.error(err.message),
+    });
+  }
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={importar.isPending}
+        className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground disabled:opacity-60"
+      >
+        {importar.isPending ? "restaurando…" : "restaurar de um backup .json exportado daqui"}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/json,.json"
+        hidden
+        onChange={(e) => enviar(e.target.files)}
+      />
+    </div>
+  );
+}
+
 function ImportarSpotify() {
   const importar = useImportarHistoricoSpotify();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -537,6 +594,83 @@ function ImportarSpotify() {
           ref={inputRef}
           type="file"
           accept="application/json,.json,application/zip,.zip"
+          multiple
+          hidden
+          onChange={(e) => enviar(e.target.files)}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Importa o histórico do YouTube Music. Diferente do Spotify, o YouTube
+ * Music não tem export oficial nem OAuth público pra histórico — o usuário
+ * precisa rodar localmente o script backend/scripts/exportar_youtube_music.py
+ * (usa a lib não-oficial "ytmusicapi") e subir o "youtube_music_historico.json"
+ * gerado por ele aqui. Mesma UI de arrastar/soltar do ImportarSpotify.
+ */
+function ImportarYoutubeMusic() {
+  const importar = useImportarHistoricoYoutubeMusic();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [arrastando, setArrastando] = useState(false);
+
+  function enviar(lista: FileList | null) {
+    const arquivos = Array.from(lista ?? []).filter((f) => /\.json$/i.test(f.name));
+    if (arquivos.length === 0) {
+      toast.error("Selecione o(s) arquivo(s) .json gerado(s) pelo script de exportação.");
+      return;
+    }
+
+    importar.mutate(arquivos, {
+      onSuccess: (r) => {
+        toast.success(`${r.faixas_novas.toLocaleString("pt-BR")} reproduções importadas.`);
+        if (r.conquistas_desbloqueadas?.length) {
+          toast.success(
+            `Novas conquistas: ${r.conquistas_desbloqueadas.map((c) => c.titulo).join(", ")}`,
+          );
+        }
+      },
+      onError: (err: Error) => toast.error(err.message),
+    });
+  }
+
+  return (
+    <div className="surface-card p-5">
+      <h3 className="font-display text-lg font-bold">Importar histórico do YouTube Music</h3>
+      <p className="mb-4 text-xs text-muted-foreground">
+        O YouTube Music não tem exportação oficial. Rode{" "}
+        <code>python scripts/exportar_youtube_music.py</code> na pasta do backend (veja o{" "}
+        <code>README.md</code>) e solte aqui o <code>youtube_music_historico.json</code> gerado.
+      </p>
+
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setArrastando(true);
+        }}
+        onDragLeave={() => setArrastando(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setArrastando(false);
+          enviar(e.dataTransfer.files);
+        }}
+        onClick={() => inputRef.current?.click()}
+        className={`grid cursor-pointer place-items-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
+          arrastando ? "border-primary bg-primary/10" : "border-border hover:border-primary/60"
+        }`}
+      >
+        <Upload className="size-6 text-primary" />
+        <p className="text-sm font-medium">
+          {importar.isPending
+            ? "Enviando e processando…"
+            : "Arraste o .json ou clique para escolher"}
+        </p>
+        <p className="text-xs text-muted-foreground">Até 40 arquivos, 60MB cada.</p>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/json,.json"
           multiple
           hidden
           onChange={(e) => enviar(e.target.files)}
