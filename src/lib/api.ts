@@ -55,7 +55,8 @@ export const api = {
     request<T>(path, { method: "POST", body: data !== undefined ? JSON.stringify(data) : null }),
   put: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: "PUT", body: data !== undefined ? JSON.stringify(data) : null }),
-  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  delete: <T>(path: string, data?: unknown) =>
+    request<T>(path, { method: "DELETE", body: data !== undefined ? JSON.stringify(data) : null }),
   /**
    * Upload de arquivos (multipart/form-data). Usado na importação do JSON do
    * histórico estendido do Spotify — o backend espera o campo "arquivos"

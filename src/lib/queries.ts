@@ -540,6 +540,32 @@ export function usePreencherCapasFaltantes() {
   });
 }
 
+export type ResultadoApagarHistorico = {
+  sucesso: boolean;
+  plays_apagadas: number;
+  conquistas_apagadas: number;
+};
+
+/**
+ * Apaga TODO o histórico de reproduções do usuário (todas as plataformas) e
+ * as conquistas desbloqueadas — usado quando ele importou o mesmo arquivo
+ * duas vezes sem querer, ou quer recomeçar do zero antes de reimportar.
+ * NÃO desconecta Spotify/YouTube Music. Ação destrutiva e irreversível;
+ * o backend exige { confirmar: true } no corpo da requisição.
+ */
+export function useApagarHistorico() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.delete<ResultadoApagarHistorico>("/api/sync/historico", { confirmar: true }),
+    onSuccess: () => {
+      // Zera tudo que é calculado a partir do histórico — praticamente todo
+      // dado da tela, então invalida geral em vez de listar chave por chave.
+      queryClient.invalidateQueries();
+    },
+  });
+}
+
 export function useAmigos() {
   const { user } = useAuth();
   return useQuery({

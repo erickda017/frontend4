@@ -27,6 +27,7 @@ import {
   useConvidarAmigo,
   useExportarHistorico,
   useGeneros,
+  useApagarHistorico,
   useImportarHistoricoSpotify,
   usePerfil,
   usePorHora,
@@ -148,9 +149,54 @@ function PerfilPage() {
           Membro desde {formatarData(perfil.membro_desde)} · {perfil.email}
           {" · "}
           <BotaoPreencherCapas />
+          {" · "}
+          <BotaoApagarHistorico />
         </p>
       ) : null}
     </AppShell>
+  );
+}
+
+/**
+ * Ação destrutiva e discreta, no mesmo rodapé do <BotaoPreencherCapas />:
+ * apaga TODO o histórico de reproduções (todas as plataformas) e as
+ * conquistas desbloqueadas, pra o usuário poder reimportar do zero — ex:
+ * quando subiu o mesmo export duas vezes sem querer. Exige duas confirmações
+ * (window.confirm) antes de chamar a API, já que não tem como desfazer.
+ */
+function BotaoApagarHistorico() {
+  const apagar = useApagarHistorico();
+
+  const handleClick = () => {
+    const primeiraConfirmacao = window.confirm(
+      "Isso apaga TODO o seu histórico de reproduções (todas as plataformas) e as conquistas desbloqueadas. Suas conexões com Spotify/YouTube Music continuam ativas. Essa ação não pode ser desfeita. Continuar?"
+    );
+    if (!primeiraConfirmacao) return;
+
+    const segundaConfirmacao = window.confirm(
+      "Tem certeza mesmo? Depois de apagar, você vai precisar reimportar o histórico do zero."
+    );
+    if (!segundaConfirmacao) return;
+
+    apagar.mutate(undefined, {
+      onSuccess: (r) => {
+        toast.success(
+          `Histórico apagado: ${r.plays_apagadas} reproduções e ${r.conquistas_apagadas} conquistas removidas.`
+        );
+      },
+      onError: (e: Error) => toast.error(e.message),
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={apagar.isPending}
+      className="underline decoration-dotted underline-offset-2 hover:text-destructive disabled:opacity-60"
+    >
+      {apagar.isPending ? "apagando…" : "esquecer histórico"}
+    </button>
   );
 }
 
