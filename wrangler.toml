@@ -1,3 +1,5 @@
 name = "sonora-frontend"
 compatibility_date = "2025-01-01"
 pages_build_output_dir = "dist"
+# wrangler.toml
+name = 'frontend44'
