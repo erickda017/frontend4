@@ -401,6 +401,87 @@ function Lado({ lado, destaque }: { lado: LadoComparacao | undefined; destaque?:
   );
 }
 
+/** Perfil resumido do amigo: banner, foto e um resumo rápido do gosto
+ *  musical dele — os mesmos dados já usados na comparação, só que aqui
+ *  isolados como "o perfil dela", sem nenhuma métrica sua misturada junto. */
+function PerfilAmigo({ amigo }: { amigo: LadoComparacao | undefined }) {
+  if (!amigo) return null;
+
+  const iniciais = (amigo.nome || "S").slice(0, 2).toUpperCase();
+  const artistaFavorito = amigo.top_artistas?.[0];
+  const generoFavorito = amigo.top_generos?.[0];
+
+  return (
+    <div className="surface-card mb-4 overflow-hidden">
+      <div className="banner-shine relative h-36 w-full sm:h-44">
+        {amigo.banner_url ? (
+          <img
+            src={amigo.banner_url}
+            alt={`Banner de ${amigo.nome}`}
+            className="size-full object-cover"
+          />
+        ) : (
+          <div className="banner-animado size-full" role="img" aria-label="Banner do perfil" />
+        )}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+
+        <div className="absolute inset-x-0 bottom-0 flex items-end gap-4 p-4 sm:p-5">
+          <div className="relative shrink-0">
+            <div className="grid size-16 place-items-center overflow-hidden rounded-2xl border-4 border-card bg-surface-2 font-display text-xl font-bold shadow-xl sm:size-20">
+              {amigo.avatar_url ? (
+                <img src={amigo.avatar_url} alt={amigo.nome} className="size-full object-cover" />
+              ) : (
+                iniciais
+              )}
+            </div>
+            <span className="absolute -inset-1 -z-10 rounded-[1.25rem] opacity-70 blur-md [background:var(--gradient-brand)]" />
+          </div>
+          <div className="min-w-0 pb-1">
+            <h2 className="truncate font-display text-2xl font-bold sm:text-3xl">{amigo.nome}</h2>
+            <p className="text-xs text-muted-foreground">Perfil sonoro</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4 sm:p-5">
+        <div className="rounded-xl bg-surface-2 p-3">
+          <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
+            Minutos ouvidos
+          </p>
+          <p className="font-display text-lg font-bold text-primary">{fmt(amigo.total_minutos)}</p>
+        </div>
+        <div className="rounded-xl bg-surface-2 p-3">
+          <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
+            Faixas ouvidas
+          </p>
+          <p className="font-display text-lg font-bold text-primary">{fmt(amigo.total_faixas)}</p>
+        </div>
+        <div className="flex items-center gap-2 rounded-xl bg-surface-2 p-3">
+          {artistaFavorito?.imagem_url ? (
+            <img
+              src={artistaFavorito.imagem_url}
+              alt={artistaFavorito.nome}
+              className="size-8 shrink-0 rounded-lg object-cover"
+            />
+          ) : null}
+          <div className="min-w-0">
+            <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
+              Artista favorito
+            </p>
+            <p className="truncate text-xs font-semibold">{artistaFavorito?.nome ?? "—"}</p>
+          </div>
+        </div>
+        <div className="rounded-xl bg-surface-2 p-3">
+          <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
+            Gênero favorito
+          </p>
+          <p className="truncate text-xs font-semibold">{generoFavorito?.nome ?? "—"}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ComparacaoPage() {
   const { amigoId } = Route.useParams();
   const { data, isLoading, isError, error } = useComparacaoAmigo(amigoId);
@@ -437,6 +518,8 @@ function ComparacaoPage() {
         />
       ) : (
         <>
+          <PerfilAmigo amigo={amigo} />
+
           <DuoPerfis eu={eu} amigo={amigo} />
 
           {/* Placar: anéis de compatibilidade + disputa por métrica */}

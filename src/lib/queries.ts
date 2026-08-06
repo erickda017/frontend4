@@ -516,6 +516,30 @@ export function useImportarHistoricoSpotify() {
   });
 }
 
+export type ResultadoPreencherCapas = {
+  sucesso: boolean;
+  capas_atualizadas: number;
+  faixas_unicas_sem_capa: number;
+};
+
+/**
+ * Backfill: preenche a capa de reproduções JÁ SALVAS sem imagem (histórico
+ * importado antes de existir busca automática de capa). Usa o token do
+ * Spotify do próprio usuário — não precisa de arquivo. Não tem botão visível
+ * na UI de propósito (uso pontual/manual); ver <BotaoPreencherCapas />.
+ */
+export function usePreencherCapasFaltantes() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<ResultadoPreencherCapas>("/api/sync/preencher-capas"),
+    onSuccess: () => {
+      for (const key of ["recentes", "top-artistas", "historico-mensal", "generos"]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
+  });
+}
+
 export function useAmigos() {
   const { user } = useAuth();
   return useQuery({

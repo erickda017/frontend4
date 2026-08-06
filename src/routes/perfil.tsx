@@ -30,6 +30,7 @@ import {
   useImportarHistoricoSpotify,
   usePerfil,
   usePorHora,
+  usePreencherCapasFaltantes,
   useRankingAmigos,
   useRemoverAmigo,
   useSalvarPerfil,
@@ -145,9 +146,43 @@ function PerfilPage() {
       {perfil ? (
         <p className="mt-6 text-xs text-muted-foreground">
           Membro desde {formatarData(perfil.membro_desde)} · {perfil.email}
+          {" · "}
+          <BotaoPreencherCapas />
         </p>
       ) : null}
     </AppShell>
+  );
+}
+
+/**
+ * Backfill manual e discreto: preenche a capa de faixas importadas antes de
+ * o import passar a buscar capa automaticamente (ver preencherCapasDoLote no
+ * backend). Fica embutido no texto do rodapé de propósito — é uma ação de
+ * manutenção pontual, não algo que precise de destaque na tela.
+ */
+function BotaoPreencherCapas() {
+  const preencher = usePreencherCapasFaltantes();
+
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        preencher.mutate(undefined, {
+          onSuccess: (r) => {
+            toast.success(
+              r.faixas_unicas_sem_capa === 0
+                ? "Nenhuma capa faltando."
+                : `${r.capas_atualizadas} de ${r.faixas_unicas_sem_capa} capas preenchidas.`
+            );
+          },
+          onError: (e: Error) => toast.error(e.message),
+        })
+      }
+      disabled={preencher.isPending}
+      className="underline decoration-dotted underline-offset-2 hover:text-foreground disabled:opacity-60"
+    >
+      {preencher.isPending ? "buscando capas…" : "capas"}
+    </button>
   );
 }
 
