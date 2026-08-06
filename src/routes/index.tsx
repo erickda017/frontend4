@@ -88,9 +88,23 @@ function Painel() {
   const { data: generos = [] } = useGeneros(6);
   const { data: porHora = [] } = usePorHora();
 
+  // Variação do último mês fechado vs. o anterior — dá contexto ao gráfico.
+  const ultimo = Number(historicoMensal.at(-1)?.total_minutos) || 0;
+  const penultimo = Number(historicoMensal.at(-2)?.total_minutos) || 0;
+  const variacaoMes = penultimo > 0 ? Math.round(((ultimo - penultimo) / penultimo) * 100) : null;
+
+  // Hora de pico, destacada no gráfico "Quando você ouve".
+  const indicePico = porHora.reduce(
+    (melhor, h, i) =>
+      (Number(h.total_faixas) || 0) > (Number(porHora[melhor]?.total_faixas) || 0) ? i : melhor,
+    0,
+  );
+  const horaPico = porHora.length ? porHora[indicePico]?.rotulo : null;
+
   return (
     <AppShell>
       <SonicHero />
+
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <TempoEscutaCard
@@ -122,10 +136,25 @@ function Painel() {
 
       <div className="mt-6 grid min-w-0 gap-4 lg:grid-cols-3">
         <div className="surface-card min-w-0 p-5 lg:col-span-2">
-          <h2 className="text-lg font-semibold">Minutos por mês</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold">Minutos por mês</h2>
+            {variacaoMes !== null ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                  variacaoMes >= 0
+                    ? "bg-primary/15 text-primary"
+                    : "bg-destructive/15 text-destructive"
+                }`}
+              >
+                {variacaoMes >= 0 ? "+" : ""}
+                {variacaoMes}% vs. mês anterior
+              </span>
+            ) : null}
+          </div>
           <p className="mb-4 text-xs text-muted-foreground">
             Últimos 8 meses (total, todas as plataformas)
           </p>
+
           <ChartFrame className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={historicoMensal}>
@@ -207,6 +236,12 @@ function Painel() {
           <h2 className="text-lg font-semibold">Quando você ouve</h2>
           <p className="mb-4 text-xs text-muted-foreground">
             Reproduções por hora do dia (fuso local)
+            {horaPico ? (
+              <>
+                {" · pico às "}
+                <span className="font-semibold text-foreground">{horaPico}</span>
+              </>
+            ) : null}
           </p>
           <ChartFrame className="h-52">
             <ResponsiveContainer width="100%" height="100%">
@@ -219,12 +254,11 @@ function Painel() {
                   interval={2}
                 />
                 <Tooltip {...chartTooltip} cursor={{ fill: "var(--muted)" }} />
-                <Bar
-                  dataKey="total_faixas"
-                  fill="var(--chart-2)"
-                  radius={[6, 6, 0, 0]}
-                  isAnimationActive={false}
-                />
+                <Bar dataKey="total_faixas" radius={[6, 6, 0, 0]} isAnimationActive={false}>
+                  {porHora.map((_, i) => (
+                    <Cell key={i} fill={i === indicePico ? "var(--chart-1)" : "var(--chart-2)"} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </ChartFrame>
@@ -235,10 +269,19 @@ function Painel() {
           <p className="mb-3 text-xs text-muted-foreground">Somando todas as plataformas</p>
           <ol className="space-y-3">
             {topArtistas.map((a, i) => (
-              <li key={a.nome_artista ?? `a-${i}`} className="flex items-center gap-3">
-                <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-secondary text-[11px] font-bold">
+              <li key={a.nome_artista ?? `a-${i}`} className="flex min-w-0 items-center gap-3">
+                <span
+                  className={`grid size-6 shrink-0 place-items-center rounded-lg text-[11px] font-bold ${
+                    i === 0
+                      ? "bg-primary text-primary-foreground"
+                      : i < 3
+                        ? "bg-primary/20 text-primary"
+                        : "bg-secondary"
+                  }`}
+                >
                   {i + 1}
                 </span>
+
                 <FotoArtista nome={a.nome_artista} url={a.imagem_url ?? null} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">

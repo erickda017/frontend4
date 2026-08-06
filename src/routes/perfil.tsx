@@ -178,37 +178,52 @@ function CartaoPerfil() {
   return (
     <>
       <div className="surface-card overflow-hidden">
-        <div
-          className="h-24 w-full bg-cover bg-center sm:h-32"
-          style={
-            bannerVisivel
-              ? { backgroundImage: `url(${bannerVisivel})` }
-              : { background: "var(--gradient-brand)" }
-          }
-          role="img"
-          aria-label="Banner do perfil"
-        />
-        <div className="-mt-10 flex flex-col gap-4 p-5 sm:flex-row sm:items-end">
-          <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-2xl border-4 border-background bg-surface-2 font-display text-2xl font-bold">
-            {avatarVisivel ? (
-              <img
-                src={avatarVisivel}
-                alt={perfil.nome_exibicao}
-                loading="lazy"
-                className="size-full object-cover"
-              />
-            ) : (
-              iniciais
-            )}
-          </div>
+        {/* Banner grande e presente. Sem imagem, entra o gradiente animado do
+            tema; com imagem/GIF, usamos <img> para o GIF continuar animando. */}
+        <div className="banner-shine relative h-48 w-full sm:h-64">
+          {bannerVisivel ? (
+            <img
+              src={bannerVisivel}
+              alt={`Banner de ${perfil.nome_exibicao}`}
+              className="size-full object-cover"
+            />
+          ) : (
+            <div className="banner-animado size-full" role="img" aria-label="Banner do perfil" />
+          )}
+          {/* Degradê para o conteúdo do cartão nunca competir com a imagem. */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
 
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate font-display text-2xl font-bold">
-              {editando ? nome || perfil.nome_exibicao : perfil.nome_exibicao}
-            </h2>
+          <div className="absolute inset-x-0 bottom-0 flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:gap-5">
+            <div className="relative shrink-0">
+              <div className="grid size-24 place-items-center overflow-hidden rounded-3xl border-4 border-card bg-surface-2 font-display text-3xl font-bold shadow-xl sm:size-28">
+                {avatarVisivel ? (
+                  <img
+                    src={avatarVisivel}
+                    alt={perfil.nome_exibicao}
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  iniciais
+                )}
+              </div>
+              <span className="absolute -inset-1 -z-10 rounded-[1.75rem] opacity-70 blur-md [background:var(--gradient-brand)]" />
+            </div>
+
+            <div className="min-w-0 flex-1 pb-1">
+              <h2 className="truncate font-display text-3xl font-bold sm:text-4xl">
+                {editando ? nome || perfil.nome_exibicao : perfil.nome_exibicao}
+              </h2>
+              <p className="truncate text-xs text-muted-foreground">
+                Membro desde {formatarData(perfil.membro_desde)}
+              </p>
+            </div>
+
             {!editando ? (
-              <button onClick={abrirEdicao} className="text-xs text-primary hover:underline">
-                editar perfil
+              <button
+                onClick={abrirEdicao}
+                className="shrink-0 self-start rounded-lg border border-border bg-card/80 px-3 py-1.5 text-xs font-medium backdrop-blur hover:border-primary/60 sm:self-auto"
+              >
+                Editar perfil
               </button>
             ) : null}
           </div>
@@ -244,7 +259,7 @@ function CartaoPerfil() {
             <div className="grid gap-4 sm:grid-cols-2">
               <CampoImagem
                 titulo="Foto de perfil"
-                descricao="Quadrada fica melhor. Use uma URL ou um arquivo do dispositivo."
+                descricao="Quadrada fica melhor. Aceita GIF animado (até 3 MB), URL ou arquivo."
                 valor={avatar}
                 onChange={setAvatar}
                 larguraMax={320}
@@ -253,11 +268,11 @@ function CartaoPerfil() {
               />
               <CampoImagem
                 titulo="Banner"
-                descricao="Imagem larga (3:1). Aparece no topo do seu perfil."
+                descricao="Imagem larga (3:1). GIF animado também funciona (até 3 MB)."
                 valor={banner}
                 onChange={setBanner}
-                larguraMax={1200}
-                alturaMax={400}
+                larguraMax={1600}
+                alturaMax={600}
                 formato="banner"
               />
             </div>
@@ -299,6 +314,7 @@ function CartaoPerfil() {
     </>
   );
 }
+
 
 function GenerosCard() {
   const { data = [], isLoading } = useGeneros(8);

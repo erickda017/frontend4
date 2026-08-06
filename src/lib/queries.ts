@@ -378,27 +378,62 @@ export type Amizade = {
   amigo_avatar_url: string | null;
 };
 
+export type FaixaComparada = {
+  nome_faixa: string;
+  nome_artista: string;
+  imagem_url: string | null;
+  minhas_reproducoes: number;
+  reproducoes_amigo: number;
+};
+
+export type AlbumComparado = {
+  nome_album: string;
+  nome_artista: string;
+  imagem_url: string | null;
+  minhas_reproducoes: number;
+  reproducoes_amigo: number;
+};
+
 export type LadoComparacao = {
   id: string;
   nome: string;
   avatar_url: string | null;
+  banner_url: string | null;
   total_faixas: number;
   total_minutos: number;
   artistas_unicos: number;
+  faixas_unicas: number;
+  albuns_unicos: number;
+  generos_unicos: number;
+  dias_ativos: number;
+  media_minutos_dia: number;
+  hora_favorita: string | null;
+  por_hora: number[];
   ultima_reproducao: string | null;
-  top_artistas: { nome: string; total: number }[];
+  top_artistas: { nome: string; total: number; imagem_url: string | null }[];
   top_generos: { nome: string; total: number }[];
+  top_faixas: { nome_faixa: string; nome_artista: string; imagem_url: string | null; total: number }[];
+  top_albuns: { nome_album: string; nome_artista: string; imagem_url: string | null; total: number }[];
 };
 
 export type Comparacao = {
   compatibilidade: number;
-  artistas_em_comum: { nome: string; minhas_reproducoes: number; reproducoes_amigo: number }[];
+  compatibilidade_generos: number;
+  artistas_em_comum: {
+    nome: string;
+    imagem_url: string | null;
+    minhas_reproducoes: number;
+    reproducoes_amigo: number;
+  }[];
   total_artistas_em_comum: number;
   faixas_em_comum: number;
+  faixas_em_comum_detalhe: FaixaComparada[];
+  albuns_em_comum: AlbumComparado[];
   generos: { genero: string; meu_total: number; total_amigo: number }[];
   eu: LadoComparacao;
   amigo: LadoComparacao;
 };
+
 
 export function usePerfil() {
   const { user } = useAuth();
@@ -558,17 +593,38 @@ export type Wrapped = {
   total_minutos?: number;
   total_minutos_ano_anterior?: number | null;
   artistas_unicos?: number;
-  top_artistas?: { nome: string; total_faixas: number; imagem_url: string | null }[];
+  faixas_unicas?: number;
+  albuns_unicos?: number;
+  dias_ativos?: number;
+  media_minutos_dia?: number;
+  top_artistas?: {
+    nome: string;
+    total_faixas: number;
+    total_minutos: number;
+    imagem_url: string | null;
+  }[];
   top_faixas?: {
     nome_faixa: string;
     nome_artista: string;
     imagem_url: string | null;
     total_plays: number;
+    total_minutos: number;
+  }[];
+  top_albuns?: {
+    nome_album: string;
+    nome_artista: string;
+    imagem_url: string | null;
+    total_plays: number;
+    total_minutos: number;
   }[];
   top_generos?: { genero: string; total_faixas: number }[];
+  por_mes?: { mes: string; total_faixas: number; total_minutos: number }[];
+  por_hora?: number[];
+  mes_favorito?: string;
   dia_favorito?: string;
   hora_favorita?: string;
 };
+
 
 export function useWrapped(ano: number) {
   const { user } = useAuth();

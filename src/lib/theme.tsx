@@ -10,7 +10,11 @@ export const TEMAS = [
   { id: "sonora", nome: "Sonora", descricao: "Verde neon sobre roxo profundo" },
   { id: "dark-neon", nome: "Dark Neon", descricao: "Preto absoluto com cyan e magenta" },
   { id: "violeta", nome: "Violeta", descricao: "Roxo-violeta vibrante, escuro do começo ao fim" },
+  { id: "rosa", nome: "Rosa", descricao: "Rosa quente com brilho coral" },
+  { id: "vermelho", nome: "Vermelho", descricao: "Vermelho intenso com acento âmbar" },
+  { id: "rosa-azul", nome: "Rosa & Azul", descricao: "Rosa vibrante equilibrado com azul elétrico" },
 ] as const;
+
 
 export type TemaId = (typeof TEMAS)[number]["id"];
 

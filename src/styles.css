@@ -128,7 +128,23 @@
   background-color: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
+  /* Mobile: impede que palavras/valores longos estiquem o cartão além da tela. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
+
+/* Itens de grid/flex têm min-width:auto por padrão, então um filho largo
+   (gráfico, palavra longa, <code>) empurra o layout inteiro para fora da
+   viewport — e o wrapper com overflow-x-hidden corta o lado direito no
+   celular. Zerar o mínimo faz o conteúdo encolher/truncar corretamente. */
+main :where(.grid, .flex) > * {
+  min-width: 0;
+}
+
+main :where(code, pre) {
+  overflow-wrap: anywhere;
+}
+
 
 @utility text-gradient {
   background: var(--gradient-brand);
@@ -259,6 +275,185 @@
   --gradient-brand: linear-gradient(100deg, oklch(0.7 0.21 305), oklch(0.75 0.17 330));
   --shadow-glow: 0 24px 70px -18px oklch(0.7 0.21 305 / 0.45);
 }
+
+[data-theme="rosa"] {
+  color-scheme: dark;
+  --background: oklch(0.16 0.05 350);
+  --foreground: oklch(0.97 0.015 350);
+  --surface: oklch(0.21 0.065 350);
+  --surface-2: oklch(0.26 0.08 350);
+  --card: oklch(0.21 0.065 350);
+  --card-foreground: oklch(0.97 0.015 350);
+  --popover: oklch(0.21 0.065 350);
+  --popover-foreground: oklch(0.97 0.015 350);
+  --primary: oklch(0.76 0.19 350);
+  --primary-foreground: oklch(0.16 0.05 350);
+  --secondary: oklch(0.28 0.075 350);
+  --secondary-foreground: oklch(0.97 0.015 350);
+  --muted: oklch(0.26 0.065 350);
+  --muted-foreground: oklch(0.78 0.055 350);
+  --accent: oklch(0.82 0.14 15);
+  --accent-foreground: oklch(0.16 0.05 350);
+  --destructive: oklch(0.63 0.23 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.35 0.085 352);
+  --input: oklch(0.35 0.085 352);
+  --ring: oklch(0.76 0.19 350);
+  --chart-1: oklch(0.76 0.19 350);
+  --chart-2: oklch(0.82 0.14 15);
+  --chart-3: oklch(0.7 0.17 330);
+  --chart-4: oklch(0.85 0.11 5);
+  --chart-5: oklch(0.64 0.15 310);
+  --gradient-hero: linear-gradient(
+    135deg,
+    oklch(0.76 0.19 350 / 0.3),
+    oklch(0.82 0.14 15 / 0.2) 55%,
+    transparent
+  );
+  --gradient-brand: linear-gradient(100deg, oklch(0.76 0.19 350), oklch(0.85 0.13 10));
+  --shadow-glow: 0 24px 70px -18px oklch(0.76 0.19 350 / 0.45);
+}
+
+[data-theme="vermelho"] {
+  color-scheme: dark;
+  --background: oklch(0.15 0.045 25);
+  --foreground: oklch(0.97 0.015 30);
+  --surface: oklch(0.2 0.06 25);
+  --surface-2: oklch(0.25 0.075 25);
+  --card: oklch(0.2 0.06 25);
+  --card-foreground: oklch(0.97 0.015 30);
+  --popover: oklch(0.2 0.06 25);
+  --popover-foreground: oklch(0.97 0.015 30);
+  --primary: oklch(0.65 0.23 25);
+  --primary-foreground: oklch(0.98 0.01 30);
+  --secondary: oklch(0.27 0.07 25);
+  --secondary-foreground: oklch(0.97 0.015 30);
+  --muted: oklch(0.25 0.06 25);
+  --muted-foreground: oklch(0.77 0.05 30);
+  --accent: oklch(0.75 0.17 55);
+  --accent-foreground: oklch(0.15 0.045 25);
+  --destructive: oklch(0.7 0.2 15);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.34 0.08 27);
+  --input: oklch(0.34 0.08 27);
+  --ring: oklch(0.65 0.23 25);
+  --chart-1: oklch(0.65 0.23 25);
+  --chart-2: oklch(0.75 0.17 55);
+  --chart-3: oklch(0.72 0.19 10);
+  --chart-4: oklch(0.8 0.14 75);
+  --chart-5: oklch(0.58 0.18 8);
+  --gradient-hero: linear-gradient(
+    135deg,
+    oklch(0.65 0.23 25 / 0.32),
+    oklch(0.75 0.17 55 / 0.2) 55%,
+    transparent
+  );
+  --gradient-brand: linear-gradient(100deg, oklch(0.65 0.23 25), oklch(0.78 0.16 55));
+  --shadow-glow: 0 24px 70px -18px oklch(0.65 0.23 25 / 0.45);
+}
+
+/* Rosa e azul: duas famílias de cor equilibradas (primário rosa, acento azul). */
+[data-theme="rosa-azul"] {
+  color-scheme: dark;
+  --background: oklch(0.15 0.05 285);
+  --foreground: oklch(0.97 0.015 320);
+  --surface: oklch(0.2 0.06 285);
+  --surface-2: oklch(0.25 0.075 288);
+  --card: oklch(0.2 0.06 285);
+  --card-foreground: oklch(0.97 0.015 320);
+  --popover: oklch(0.2 0.06 285);
+  --popover-foreground: oklch(0.97 0.015 320);
+  --primary: oklch(0.75 0.2 345);
+  --primary-foreground: oklch(0.15 0.05 285);
+  --secondary: oklch(0.27 0.075 265);
+  --secondary-foreground: oklch(0.97 0.015 320);
+  --muted: oklch(0.25 0.06 275);
+  --muted-foreground: oklch(0.78 0.055 290);
+  --accent: oklch(0.72 0.17 250);
+  --accent-foreground: oklch(0.15 0.05 285);
+  --destructive: oklch(0.63 0.23 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.35 0.09 290);
+  --input: oklch(0.35 0.09 290);
+  --ring: oklch(0.75 0.2 345);
+  --chart-1: oklch(0.75 0.2 345);
+  --chart-2: oklch(0.72 0.17 250);
+  --chart-3: oklch(0.83 0.13 330);
+  --chart-4: oklch(0.66 0.16 265);
+  --chart-5: oklch(0.8 0.12 220);
+  --gradient-hero: linear-gradient(
+    135deg,
+    oklch(0.75 0.2 345 / 0.3),
+    oklch(0.72 0.17 250 / 0.24) 55%,
+    transparent
+  );
+  --gradient-brand: linear-gradient(100deg, oklch(0.75 0.2 345), oklch(0.72 0.17 250));
+  --shadow-glow: 0 24px 70px -18px oklch(0.75 0.2 345 / 0.45);
+}
+
+/* --------------------------------------------------------------------------
+ * Banner de perfil: gradiente animado + brilho que atravessa a faixa.
+ * Usado quando o usuário ainda não subiu uma imagem/GIF próprio.
+ * -------------------------------------------------------------------------- */
+
+@utility banner-animado {
+  background-image: linear-gradient(
+    115deg,
+    var(--color-primary) 0%,
+    var(--color-accent) 30%,
+    var(--surface-2) 55%,
+    var(--color-primary) 80%,
+    var(--color-accent) 100%
+  );
+  background-size: 300% 300%;
+  animation: sonora-banner 18s ease-in-out infinite;
+}
+
+@utility banner-shine {
+  position: relative;
+  overflow: hidden;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 35%,
+      oklch(1 0 0 / 0.16) 50%,
+      transparent 65%
+    );
+    transform: translateX(-100%);
+    animation: sonora-shine 6s ease-in-out infinite;
+  }
+}
+
+@keyframes sonora-banner {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes sonora-shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner-animado,
+  .banner-shine::after {
+    animation: none;
+  }
+}
+
 
 /* --------------------------------------------------------------------------
  * "Tocando agora": brilho dinâmico da capa + pulsação orgânica no ritmo

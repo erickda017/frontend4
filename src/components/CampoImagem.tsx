@@ -5,9 +5,31 @@ import { ImagePlus, Loader2, X } from "lucide-react";
 // Campo de imagem para o perfil: aceita URL ou arquivo do dispositivo.
 // Arquivos são redimensionados/compactados no navegador (canvas) e virados
 // em data URL, para funcionar sem serviço de storage. Sempre mostra preview.
+//
+// EXCEÇÃO: GIFs animados NÃO passam pelo canvas (isso congelaria a animação
+// no primeiro quadro). Eles são lidos como data URL crua, com limite de
+// tamanho para não estourar o payload do perfil.
 // ----------------------------------------------------------------------------
 
+const LIMITE_GIF_BYTES = 3 * 1024 * 1024; // 3 MB
+
+function lerComoDataUrl(arquivo: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(String(leitor.result));
+    leitor.onerror = () => reject(new Error("Não consegui ler esse arquivo."));
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
 async function comprimir(arquivo: File, larguraMax: number, alturaMax: number): Promise<string> {
+  if (arquivo.type === "image/gif") {
+    if (arquivo.size > LIMITE_GIF_BYTES) {
+      throw new Error("GIF muito pesado (máx. 3 MB). Tente um GIF menor.");
+    }
+    return lerComoDataUrl(arquivo);
+  }
+
   const bitmapUrl = URL.createObjectURL(arquivo);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -32,6 +54,7 @@ async function comprimir(arquivo: File, larguraMax: number, alturaMax: number): 
     URL.revokeObjectURL(bitmapUrl);
   }
 }
+
 
 export function CampoImagem({
   titulo,
