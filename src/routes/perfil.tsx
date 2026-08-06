@@ -5,6 +5,7 @@ import {
   Clock,
   Disc3,
   Download,
+  Loader2,
   Music4,
   Sparkles,
   Trophy,
@@ -20,6 +21,7 @@ import { CampoImagem } from "@/components/CampoImagem";
 import { EmptyState, SkeletonCards } from "@/components/States";
 import { StatCard } from "@/components/StatCard";
 import { TempoEscutaCard } from "@/components/TempoEscutaCard";
+import { useProgressoUpload } from "@/hooks/use-progresso-upload";
 import {
   type PeriodoResumo,
   useAceitarAmigo,
@@ -223,11 +225,16 @@ function BotaoPreencherCapas() {
       onClick={() =>
         preencher.mutate(undefined, {
           onSuccess: (r) => {
-            toast.success(
-              r.faixas_unicas_sem_capa === 0
-                ? "Nenhuma capa faltando."
-                : `${r.capas_atualizadas} de ${r.faixas_unicas_sem_capa} capas preenchidas.`
-            );
+            if (r.faixas_unicas_sem_capa === 0) {
+              toast.success("Nenhuma capa faltando.");
+            } else if (r.capas_atualizadas === r.faixas_unicas_sem_capa) {
+              toast.success(`${r.capas_atualizadas} capas preenchidas.`);
+            } else {
+              toast.warning(
+                `${r.capas_atualizadas} de ${r.faixas_unicas_sem_capa} capas preenchidas. ` +
+                  `As restantes podem ter sido removidas do catálogo do Spotify — tente de novo em alguns minutos.`,
+              );
+            }
           },
           onError: (e: Error) => toast.error(e.message),
         })
@@ -536,6 +543,7 @@ function ImportarSpotify() {
   const importar = useImportarHistoricoSpotify();
   const inputRef = useRef<HTMLInputElement>(null);
   const [arrastando, setArrastando] = useState(false);
+  const mensagemProgresso = useProgressoUpload(importar.isPending);
 
   function enviar(lista: FileList | null) {
     const arquivos = Array.from(lista ?? []).filter((f) => /\.(json|zip)$/i.test(f.name));
@@ -570,32 +578,42 @@ function ImportarSpotify() {
       <div
         onDragOver={(e) => {
           e.preventDefault();
-          setArrastando(true);
+          if (!importar.isPending) setArrastando(true);
         }}
         onDragLeave={() => setArrastando(false)}
         onDrop={(e) => {
           e.preventDefault();
           setArrastando(false);
-          enviar(e.dataTransfer.files);
+          if (!importar.isPending) enviar(e.dataTransfer.files);
         }}
-        onClick={() => inputRef.current?.click()}
-        className={`grid cursor-pointer place-items-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
-          arrastando ? "border-primary bg-primary/10" : "border-border hover:border-primary/60"
-        }`}
+        onClick={() => !importar.isPending && inputRef.current?.click()}
+        aria-busy={importar.isPending}
+        className={`grid place-items-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
+          importar.isPending ? "cursor-wait border-primary/60 bg-primary/5" : "cursor-pointer"
+        } ${arrastando ? "border-primary bg-primary/10" : "border-border hover:border-primary/60"}`}
       >
-        <Upload className="size-6 text-primary" />
-        <p className="text-sm font-medium">
+        {importar.isPending ? (
+          <Loader2 className="size-6 animate-spin text-primary" />
+        ) : (
+          <Upload className="size-6 text-primary" />
+        )}
+        <p className="text-sm font-medium" role="status" aria-live="polite">
           {importar.isPending
-            ? "Enviando e processando…"
+            ? mensagemProgresso
             : "Arraste o .zip (ou os .json) ou clique para escolher"}
         </p>
-        <p className="text-xs text-muted-foreground">Até 40 arquivos, 60MB cada.</p>
+        <p className="text-xs text-muted-foreground">
+          {importar.isPending
+            ? "Não feche esta página — históricos grandes podem levar alguns minutos."
+            : "Até 40 arquivos, 60MB cada."}
+        </p>
         <input
           ref={inputRef}
           type="file"
           accept="application/json,.json,application/zip,.zip"
           multiple
           hidden
+          disabled={importar.isPending}
           onChange={(e) => enviar(e.target.files)}
         />
       </div>
@@ -614,6 +632,7 @@ function ImportarYoutubeMusic() {
   const importar = useImportarHistoricoYoutubeMusic();
   const inputRef = useRef<HTMLInputElement>(null);
   const [arrastando, setArrastando] = useState(false);
+  const mensagemProgresso = useProgressoUpload(importar.isPending);
 
   function enviar(lista: FileList | null) {
     const arquivos = Array.from(lista ?? []).filter((f) => /\.json$/i.test(f.name));
@@ -647,32 +666,40 @@ function ImportarYoutubeMusic() {
       <div
         onDragOver={(e) => {
           e.preventDefault();
-          setArrastando(true);
+          if (!importar.isPending) setArrastando(true);
         }}
         onDragLeave={() => setArrastando(false)}
         onDrop={(e) => {
           e.preventDefault();
           setArrastando(false);
-          enviar(e.dataTransfer.files);
+          if (!importar.isPending) enviar(e.dataTransfer.files);
         }}
-        onClick={() => inputRef.current?.click()}
-        className={`grid cursor-pointer place-items-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
-          arrastando ? "border-primary bg-primary/10" : "border-border hover:border-primary/60"
-        }`}
+        onClick={() => !importar.isPending && inputRef.current?.click()}
+        aria-busy={importar.isPending}
+        className={`grid place-items-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
+          importar.isPending ? "cursor-wait border-primary/60 bg-primary/5" : "cursor-pointer"
+        } ${arrastando ? "border-primary bg-primary/10" : "border-border hover:border-primary/60"}`}
       >
-        <Upload className="size-6 text-primary" />
-        <p className="text-sm font-medium">
-          {importar.isPending
-            ? "Enviando e processando…"
-            : "Arraste o .json ou clique para escolher"}
+        {importar.isPending ? (
+          <Loader2 className="size-6 animate-spin text-primary" />
+        ) : (
+          <Upload className="size-6 text-primary" />
+        )}
+        <p className="text-sm font-medium" role="status" aria-live="polite">
+          {importar.isPending ? mensagemProgresso : "Arraste o .json ou clique para escolher"}
         </p>
-        <p className="text-xs text-muted-foreground">Até 40 arquivos, 60MB cada.</p>
+        <p className="text-xs text-muted-foreground">
+          {importar.isPending
+            ? "Não feche esta página — históricos grandes podem levar alguns minutos."
+            : "Até 40 arquivos, 60MB cada."}
+        </p>
         <input
           ref={inputRef}
           type="file"
           accept="application/json,.json"
           multiple
           hidden
+          disabled={importar.isPending}
           onChange={(e) => enviar(e.target.files)}
         />
       </div>

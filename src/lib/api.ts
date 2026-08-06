@@ -62,16 +62,38 @@ export const api = {
    * histórico estendido do Spotify — o backend espera o campo "arquivos"
    * (ver backend/src/routes/syncRoutes.js, upload.array('arquivos', 40)).
    * Não define Content-Type de propósito: o browser precisa montar o boundary.
+   *
+   * Tem um timeout (padrão 3min): sem ele, se o backend travar ou o host
+   * grátis estiver "dormindo" (cold start), o fetch fica pendurado pra
+   * sempre e a UI mostra "processando…" indefinidamente sem nunca dar
+   * erro nem sucesso. Com o timeout, pelo menos avisamos o usuário.
    */
-  upload: async <T>(path: string, arquivos: File[]): Promise<T> => {
+  upload: async <T>(path: string, arquivos: File[], timeoutMs = 180_000): Promise<T> => {
     const form = new FormData();
     for (const arquivo of arquivos) form.append("arquivos", arquivo);
 
-    const res = await fetch(`${API_URL}${path}`, {
-      method: "POST",
-      headers: await authHeader(),
-      body: form,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}${path}`, {
+        method: "POST",
+        headers: await authHeader(),
+        body: form,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        throw new ApiError(
+          0,
+          "A importação demorou demais e foi cancelada. Se o arquivo for muito grande, tente dividir em partes menores ou tente de novo — o servidor pode estar iniciando (primeiro acesso após um tempo parado costuma ser mais lento).",
+        );
+      }
+      throw new ApiError(0, "Não foi possível conectar ao servidor. Verifique sua conexão e tente de novo.");
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const body = await res.json().catch(() => null);
     if (!res.ok) {

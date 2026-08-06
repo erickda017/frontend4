@@ -488,6 +488,8 @@ export type ResultadoImportacao = {
   sucesso: boolean;
   faixas_novas: number;
   arquivos_ignorados?: number;
+  /** Só presente na restauração de backup próprio (ver syncRoutes.js /importar-backup). */
+  linhas_ignoradas?: number;
   conquistas_desbloqueadas: { chave: string; titulo: string }[];
 };
 
