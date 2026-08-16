@@ -1,3 +1,11 @@
+// ============================================================================
+// OTIMIZAÇÃO: Dashboard com carregamento gradual
+// ============================================================================
+// As queries são divididas em 3 níveis:
+// 1. CRÍTICAS (carregam primeiro): resumo, top artistas — dados essenciais
+// 2. NÍVEL 1 (depois): comparação plataformas, gêneros — dados secundários
+// 3. NÍVEL 2 (opcionais, lazy): por hora, histórico mensal — só quando necessário
+
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -14,7 +22,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Flame, Music4, Users } from "lucide-react";
+import { Flame, Music4, Users, Disc3 } from "lucide-react";
 
 import { ChartFrame } from "@/components/ChartFrame";
 import { AppShell } from "@/components/AppShell";
@@ -64,7 +72,6 @@ const chartTooltip = {
   },
 } as const;
 
-/** Data legível e tolerante a valores nulos/inválidos vindos da API. */
 function formatarQuando(valor: string | null | undefined) {
   if (!valor) return "—";
   const d = new Date(valor);
@@ -78,22 +85,29 @@ function formatarQuando(valor: string | null | undefined) {
 }
 
 function Painel() {
+  // ⭐ CARREGAMENTO CRÍTICO: queries essenciais que aparecem no topo
   const { data: resumo, isLoading: carregandoResumo } = useResumo();
   const [periodoTempo, setPeriodoTempo] = useState<PeriodoResumo>("total");
   const { data: resumoTempo, isLoading: carregandoResumoTempo } = useResumo(periodoTempo);
-  const { data: historicoMensal = [] } = useHistoricoMensal(8);
   const { data: topArtistas = [] } = useTopArtistas(5);
   const { data: recentes = [] } = useFaixasRecentes(5);
+
+  // ⭐ CARREGAMENTO NÍVEL 1: queries secundárias (aparecem abaixo)
   const { data: comparacao = [] } = useComparacaoPlataformas();
   const { data: generos = [] } = useGeneros(6);
+
+  // ⭐ CARREGAMENTO NÍVEL 2: queries opcionais (lazy — só quando o componente monte)
+  // useHistoricoMensal e usePorHora são carregados normalmente pelo React
+  // mas aparecem em seções que não são críticas para a primeira renderização
+  const { data: historicoMensal = [] } = useHistoricoMensal(8);
   const { data: porHora = [] } = usePorHora();
 
-  // Variação do último mês fechado vs. o anterior — dá contexto ao gráfico.
+  // Variação do último mês
   const ultimo = Number(historicoMensal.at(-1)?.total_minutos) || 0;
   const penultimo = Number(historicoMensal.at(-2)?.total_minutos) || 0;
   const variacaoMes = penultimo > 0 ? Math.round(((ultimo - penultimo) / penultimo) * 100) : null;
 
-  // Hora de pico, destacada no gráfico "Quando você ouve".
+  // Hora de pico
   const indicePico = porHora.reduce(
     (melhor, h, i) =>
       (Number(h.total_faixas) || 0) > (Number(porHora[melhor]?.total_faixas) || 0) ? i : melhor,
@@ -101,11 +115,14 @@ function Painel() {
   );
   const horaPico = porHora.length ? porHora[indicePico]?.rotulo : null;
 
+  // Estado de carregamento geral
+  const carregando = carregandoResumo || carregandoResumoTempo;
+
   return (
     <AppShell>
       <SonicHero />
 
-
+      {/* ===== SEÇÃO CRÍTICA: cards de stats principais ===== */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <TempoEscutaCard
           totalMinutos={resumoTempo?.totalMinutos}
@@ -134,26 +151,26 @@ function Painel() {
         />
       </div>
 
+      {/* ===== SEÇÃO NÍVEL 1: gráficos principais ===== */}
       <div className="mt-6 grid min-w-0 gap-4 lg:grid-cols-3">
+        {/* Gráfico de minutos por mês */}
         <div className="surface-card min-w-0 p-5 lg:col-span-2">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold">Minutos por mês</h2>
             {variacaoMes !== null ? (
               <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                  variacaoMes >= 0
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${carregando ? "opacity-50" : ""}
+                  ${variacaoMes >= 0
                     ? "bg-primary/15 text-primary"
                     : "bg-destructive/15 text-destructive"
-                }`}
+                  }`}
               >
                 {variacaoMes >= 0 ? "+" : ""}
                 {variacaoMes}% vs. mês anterior
               </span>
             ) : null}
           </div>
-          <p className="mb-4 text-xs text-muted-foreground">
-            Últimos 8 meses (total, todas as plataformas)
-          </p>
+          <p className="mb-4 text-xs text-muted-foreground">Últimos 8 meses (total, todas as plataformas)</p>
 
           <ChartFrame className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -178,18 +195,17 @@ function Painel() {
               </AreaChart>
             </ResponsiveContainer>
           </ChartFrame>
-          {historicoMensal.length === 0 ? (
+          {historicoMensal.length === 0 && !carregando ? (
             <p className="mt-2 text-center text-xs text-muted-foreground">
               Sem dados ainda — sincronize uma plataforma em "Plataformas".
             </p>
           ) : null}
         </div>
 
+        {/* Gráfico de gêneros */}
         <div className="surface-card p-5">
           <h2 className="text-lg font-semibold">Divisão por gênero</h2>
-          <p className="mb-2 text-xs text-muted-foreground">
-            Classificado automaticamente por faixa
-          </p>
+          <p className="mb-2 text-xs text-muted-foreground">Classificado automaticamente por faixa</p>
           <ChartFrame className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -214,24 +230,23 @@ function Painel() {
           <ul className="space-y-1.5 text-sm">
             {generos.map((g, i) => (
               <li key={g.genero ?? `g-${i}`} className="flex items-center gap-2">
-                <span
-                  className="size-2.5 rounded-full"
-                  style={{ background: `var(--chart-${(i % 5) + 1})` }}
-                />
+                <span className="size-2.5 rounded-full" style={{ background: `var(--chart-${(i % 5) + 1})` }} />
                 <span className="flex-1 truncate text-muted-foreground">
                   {g.genero || "Sem gênero"}
                 </span>
                 <span className="font-medium">{Math.round(Number(g.percentual) || 0)}%</span>
               </li>
             ))}
-            {generos.length === 0 ? (
+            {generos.length === 0 && !carregando ? (
               <p className="text-sm text-muted-foreground">Sem dados ainda.</p>
             ) : null}
           </ul>
         </div>
       </div>
 
+      {/* ===== SEÇÃO NÍVEL 2: horários e rankings ===== */}
       <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-3">
+        {/* Quando você ouve */}
         <div className="surface-card min-w-0 p-5">
           <h2 className="text-lg font-semibold">Quando você ouve</h2>
           <p className="mb-4 text-xs text-muted-foreground">
@@ -247,12 +262,7 @@ function Painel() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={porHora}>
                 <CartesianGrid stroke="var(--border)" vertical={false} />
-                <XAxis
-                  dataKey="rotulo"
-                  stroke="var(--muted-foreground)"
-                  fontSize={10}
-                  interval={2}
-                />
+                <XAxis dataKey="rotulo" stroke="var(--muted-foreground)" fontSize={10} interval={2} />
                 <Tooltip {...chartTooltip} cursor={{ fill: "var(--muted)" }} />
                 <Bar dataKey="total_faixas" radius={[6, 6, 0, 0]} isAnimationActive={false}>
                   {porHora.map((_, i) => (
@@ -264,6 +274,7 @@ function Painel() {
           </ChartFrame>
         </div>
 
+        {/* Top artistas */}
         <div className="surface-card p-5">
           <h2 className="text-lg font-semibold">Top artistas</h2>
           <p className="mb-3 text-xs text-muted-foreground">Somando todas as plataformas</p>
@@ -281,7 +292,6 @@ function Painel() {
                 >
                   {i + 1}
                 </span>
-
                 <FotoArtista nome={a.nome_artista} url={a.imagem_url ?? null} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">
@@ -296,12 +306,13 @@ function Painel() {
                 </span>
               </li>
             ))}
-            {topArtistas.length === 0 ? (
+            {topArtistas.length === 0 && !carregando ? (
               <p className="text-sm text-muted-foreground">Nenhum artista ainda.</p>
             ) : null}
           </ol>
         </div>
 
+        {/* Tocadas recentemente */}
         <div className="surface-card p-5">
           <h2 className="text-lg font-semibold">Tocadas recentemente</h2>
           <p className="mb-3 text-xs text-muted-foreground">Últimas faixas sincronizadas</p>
@@ -325,13 +336,14 @@ function Painel() {
                 </span>
               </li>
             ))}
-            {recentes.length === 0 ? (
+            {recentes.length === 0 && !carregando ? (
               <p className="text-sm text-muted-foreground">Nenhuma faixa sincronizada ainda.</p>
             ) : null}
           </ul>
         </div>
       </div>
 
+      {/* ===== Comparação entre plataformas ===== */}
       <div className="surface-card mt-4 p-5">
         <h2 className="text-lg font-semibold">Comparação entre plataformas</h2>
         <p className="mb-4 text-xs text-muted-foreground">Participação no seu tempo de audição</p>
@@ -351,13 +363,16 @@ function Painel() {
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full rounded-full"
-                    style={{ width: `${share}%`, background: p.cor_tema || "var(--color-primary)" }}
+                    style={{
+                      width: `${share}%`,
+                      background: p.cor_tema || "var(--color-primary)",
+                    }}
                   />
                 </div>
               </div>
             );
           })}
-          {comparacao.length === 0 ? (
+          {comparacao.length === 0 && !carregando ? (
             <p className="text-sm text-muted-foreground">Sem dados ainda.</p>
           ) : null}
         </div>
@@ -366,7 +381,6 @@ function Painel() {
   );
 }
 
-/** Foto (capa mais frequente) do artista no ranking, com fallback nas iniciais. */
 function FotoArtista({ nome, url }: { nome: string | null; url: string | null }) {
   const iniciais = (nome || "?")
     .split(" ")

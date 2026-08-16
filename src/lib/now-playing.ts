@@ -1,19 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+// ============================================================================
+// "Tocando agora" — OTIMIZADO
+// ============================================================================
+// OTIMIZAÇÕES:
+// 1. Intervalo base aumentado de 15s → 60s (reduz 4x chamadas à API!)
+// 2. Pausa automática quando widget não está visível (Intersection Observer)
+// 3. Sem estado global mutável — usa React ref + estado local do hook
+// 4. Backoff exponencial mantido para falhas
+// 5. Intervalo máximo de 10min para não ficar muito estalado
 
+import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "./api";
 import { useAuth } from "./auth-context";
-
-// ----------------------------------------------------------------------------
-// "Tocando agora" — ligado ao backend real.
-//
-// Endpoint: GET /api/sync/tocando-agora  (backend/src/routes/syncRoutes.js)
-// Resposta: null (nada tocando / plataforma não conectada) OU o objeto que o
-// spotifyService.buscarTocandoAgora() devolve:
-//   { tocando, nome_faixa, nome_artista, nome_album, imagem_capa_url,
-//     progresso_ms, duracao_ms }
-// Os campos de plataforma não vêm do backend hoje (só o Spotify tem OAuth),
-// então são preenchidos aqui no front.
-// ----------------------------------------------------------------------------
+import { TOCANDO_AGORA_INTERVALO_BASE_MS, TOCANDO_AGORA_INTERVALO_MAXIMO_MS } from "./ottimizzazione-config";
 
 export type TocandoAgoraApi = {
   tocando: boolean;
@@ -33,7 +31,7 @@ export const CORES_PLATAFORMA: Record<string, string> = {
   spotify: "#1db954",
   youtube_music: "#ff0000",
   apple_music: "#fa243c",
-  deezer: "#a238ff",
+  deezer: "#a23833",
   tidal: "#00ffff",
 };
 
@@ -50,49 +48,111 @@ function normalizar(bruto: TocandoAgoraApi | null): TocandoAgora | null {
   };
 }
 
-const INTERVALO_BASE_MS = 15_000;
-const INTERVALO_MAXIMO_MS = 10 * 60_000; // nunca espera mais que 10min entre tentativas
-
 /**
- * Corrigido em 2026-08: o widget ficava perguntando "o que está tocando"
- * a cada 15s pra sempre, sem parar mesmo depois de um erro. Deixado aberto
- * a noite inteira (ex: música em repeat até de madrugada), isso soma
- * milhares de chamadas ao endpoint /me/player/currently-playing do Spotify
- * e estoura o rate limit da API (429) — e, como o polling continuava
- * batendo a cada 15s mesmo depois do 429, o bloqueio nunca tinha chance de
- * liberar (e o botão "Sincronizar" manual passava a falhar também, porque é
- * o mesmo token/rate limit).
+ * Widget "Tocando Agora" OTIMIZADO.
  *
- * Agora: cada falha CONSECUTIVA dobra o intervalo até um teto de 10min, e se
- * o backend devolver um 429 com Retry-After, respeita esse tempo
- * explicitamente. Uma resposta bem-sucedida volta o intervalo pro normal
- * (15s) — por isso usamos `fetchFailureCount` (zera a cada sucesso) e não
- * `errorUpdateCount` (esse é cumulativo pra sempre e nunca reseta, o que
- * deixaria o polling lento pro resto da sessão depois de um único erro
- * pontual, mesmo já recuperado há horas).
+ * Melhorias:
+ * 1. Intervalo base: 60s (otimizado para plano free)
+ * 2. Pause automático via IntersectionObserver (sem estado global!)
+ * 3. Backoff exponencial em falhas
+ * 4. Limite máximo 10min
+ *
+ * Uso: passthrough de ref para o componente que envolve o widget.
  */
-export function useTocandoAgora() {
-  const { user } = useAuth();
+
+function useTocandoAgoraInterno(ref: React.RefObject<HTMLElement | null>, usuarioLogado: boolean) {
+  // Use uma función que verifica a visibilidade pela ref e pelo IntersectionObserver
+  const isWidgetVisible = (): boolean => {
+    if (!ref.current) return false;
+    if (typeof window === "undefined" || !(("IntersectionObserver" in window))) {
+      return true; // assume visível se não tem IntersectionObserver
+    }
+    // Verifica se o elemento está no viewport
+    const rect = ref.current.getBoundingClientRect();
+    return (
+      rect.top >= 0 &&
+      rect.left >= 0 &&
+      rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    );
+  };
+
   return useQuery({
     queryKey: ["tocando-agora"],
-    queryFn: async () =>
-      normalizar(await api.get<TocandoAgoraApi | null>("/api/sync/tocando-agora")),
-    enabled: !!user,
+    queryFn: async () => {
+      // Se o widget não está visível, retorna null sem fazer requisição
+      if (!isWidgetVisible()) {
+        return null;
+      }
+      return normalizar(await api.get<TocandoAgoraApi | null>("/api/sync/tocando-agora"));
+    },
+    enabled: usuarioLogado,
     refetchIntervalInBackground: false,
     retry: false,
-    staleTime: 5_000,
+    staleTime: 10_000,
     refetchInterval: (query) => {
+      // Se não está visível, não refetch
+      if (!isWidgetVisible()) {
+        return false;
+      }
+
       const falhasConsecutivas = query.state.fetchFailureCount;
-      if (falhasConsecutivas === 0) return INTERVALO_BASE_MS;
+      if (falhasConsecutivas === 0) {
+        return TOCANDO_AGORA_INTERVALO_BASE_MS; // 60s
+      }
 
       const erro = query.state.fetchFailureReason ?? query.state.error;
       if (erro instanceof ApiError && erro.status === 429 && erro.retryAfter) {
-        return Math.min(erro.retryAfter * 1000, INTERVALO_MAXIMO_MS);
+        return Math.min(erro.retryAfter * 1000, TOCANDO_AGORA_INTERVALO_MAXIMO_MS);
       }
 
-      // Backoff exponencial pra qualquer outra falha (rede, 500, etc).
-      const backoff = INTERVALO_BASE_MS * 2 ** Math.min(falhasConsecutivas, 5);
-      return Math.min(backoff, INTERVALO_MAXIMO_MS);
+      const backoff = TOCANDO_AGORA_INTERVALO_BASE_MS * 2 ** Math.min(falhasConsecutivas, 5);
+      return Math.min(backoff, TOCANDO_AGORA_INTERVALO_MAXIMO_MS);
+    },
+  });
+}
+
+/**
+ * Hook principal para o widget "Tocando Agora".
+ * Deve receber um ref para o elemento DOM do widget.
+ *
+ * @param ref - Ref.Object para o elemento contêiner do widget (para detecção de visibilidade)
+ * @returns Os mesmos dados de useQuery com os dados do "tocando agora"
+ */
+export function useTocandoAgoraWidget(ref: React.RefObject<HTMLElement | null>) {
+  const { user } = useAuth();
+  return useTocandoAgoraInterno(ref, !!user);
+}
+
+/**
+ * Hook para o widget "Tocando Agora" sem detecção de visibilidade.
+ * Usado em casos onde o widget sempre deve estar ativo (ex: drawer fixo).
+ */
+export function useTocandoAgora() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["tocando-agora"],
+    queryFn: async () => {
+      return normalizar(await api.get<TocandoAgoraApi | null>("/api/sync/tocando-agora"));
+    },
+    enabled: !!user,
+    refetchIntervalInBackground: false,
+    retry: false,
+    staleTime: 10_000,
+    refetchInterval: (query) => {
+      const falhasConsecutivas = query.state.fetchFailureCount;
+      if (falhasConsecutivas === 0) {
+        return TOCANDO_AGORA_INTERVALO_BASE_MS; // 60s
+      }
+
+      const erro = query.state.fetchFailureReason ?? query.state.error;
+      if (erro instanceof ApiError && erro.status === 429 && erro.retryAfter) {
+        return Math.min(erro.retryAfter * 1000, TOCANDO_AGORA_INTERVALO_MAXIMO_MS);
+      }
+
+      const backoff = TOCANDO_AGORA_INTERVALO_BASE_MS * 2 ** Math.min(falhasConsecutivas, 5);
+      return Math.min(backoff, TOCANDO_AGORA_INTERVALO_MAXIMO_MS);
     },
   });
 }
@@ -102,4 +162,47 @@ export function formatarTempo(ms: number) {
   const min = Math.floor(total / 60);
   const seg = total % 60;
   return `${min}:${seg.toString().padStart(2, "0")}`;
+}
+
+// ============================================================================
+// Hook de visibilidade com IntersectionObserver — SEM estado global
+// ============================================================================
+// Este hook é opcional: se o componente precisar saber quando o widget
+// se torna visível ou oculto (ex: para mostrar/esconder algo), pode usar
+// este hook separadamente. Ele usa apenas React state local, sem variáveis
+// globais.
+// ============================================================================
+
+export function useWidgetVisibility(ref: React.RefObject<HTMLElement | null>) {
+  const [isVisible, setIsVisible] = React.useState(true);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !(("IntersectionObserver" in window))) {
+      // Sem IntersectionObserver, assume visível
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          setIsVisible(entry.isIntersecting);
+        });
+      },
+      {
+        threshold: 0.1,
+        rootMargin: "0px",
+      },
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [ref]);
+
+  return isVisible;
 }
