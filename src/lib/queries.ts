@@ -657,3 +657,128 @@ export function useComparacaoComAmigo(amigoId: string) {
     refetchOnWindowFocus: false,
   });
 }
+
+// ============================================================================
+// Wrapped (resumo anual tipo "Spotify Wrapped")
+// ============================================================================
+export type WrappedAlbum = {
+  nome_album: string;
+  nome_artista: string;
+  imagem_url: string | null;
+  total_plays: number;
+};
+
+export type WrappedFaixa = {
+  nome_faixa: string;
+  nome_artista: string;
+  imagem_url: string | null;
+  total_plays: number;
+};
+
+export type WrappedArtista = {
+  nome: string;
+  total_faixas: number;
+  imagem_url: string | null;
+};
+
+export type WrappedGenero = {
+  genero: string;
+  total_faixas: number;
+};
+
+export type WrappedPorMes = {
+  mes: string;
+  total_faixas: number;
+};
+
+export type Wrapped = {
+  ano: number;
+  tem_dados: boolean;
+  total_faixas: number;
+  total_minutos: number;
+  artistas_unicos: number;
+  albuns_unicos: number;
+  dias_ativos: number;
+  total_minutos_ano_anterior: number | null;
+  hora_favorita: string | null;
+  dia_favorito: string | null;
+  mes_favorito: string | null;
+  media_minutos_dia: number;
+  top_albuns: WrappedAlbum[];
+  top_faixas: WrappedFaixa[];
+  top_artistas: WrappedArtista[];
+  top_generos: WrappedGenero[];
+  por_mes: WrappedPorMes[];
+};
+
+export function useWrapped(ano: number) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["wrapped", ano],
+    queryFn: () => api.get<Wrapped>(`/api/stats/wrapped?ano=${ano}`),
+    enabled: !!user,
+    staleTime: STATS_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+  });
+}
+// ============================================================================
+export type WrappedAlbum = {
+  nome_album: string;
+  nome_artista: string;
+  imagem_url: string | null;
+  total_plays: number;
+};
+
+export type WrappedFaixa = {
+  nome_faixa: string;
+  nome_artista: string;
+  imagem_url: string | null;
+  total_plays: number;
+};
+
+export type WrappedArtista = {
+  nome: string;
+  total_faixas: number;
+  imagem_url: string | null;
+};
+
+export type WrappedGenero = {
+  genero: string;
+  total_faixas: number;
+};
+
+export type WrappedPorMes = {
+  mes: string;
+  total_faixas: number;
+};
+
+export type Wrapped = {
+  ano: number;
+  tem_dados: boolean;
+  total_faixas: number;
+  total_minutos: number;
+  artistas_unicos: number;
+  albuns_unicos: number;
+  dias_ativos: number;
+  total_minutos_ano_anterior: number | null;
+  hora_favorita: string | null;
+  dia_favorito: string | null;
+  mes_favorito: string | null;
+  media_minutos_dia: number;
+  top_albuns: WrappedAlbum[];
+  top_faixas: WrappedFaixa[];
+  top_artistas: WrappedArtista[];
+  top_generos: WrappedGenero[];
+  por_mes: WrappedPorMes[];
+};
+
+export function useWrapped(ano: number) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["wrapped", ano],
+    queryFn: () => api.get<Wrapped>(`/api/stats/wrapped?ano=${ano}`),
+    enabled: !!user,
+    staleTime: STATS_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+  });
+}
