@@ -18,9 +18,6 @@ import {
   PROFIL_STALE_TIME_MS,
   CONQUISTAS_STALE_TIME_MS,
   PLATAFORMAS_STALE_TIME_MS,
-  TOCANDO_AGORA_INTERVALO_BASE_MS,
-  TOCANDO_AGORA_INTERVALO_MAXIMO_MS,
-  EXCLUSAO_DURANTE_IMPORTACAO,
 } from "./ottimizzazione-config";
 
 // Tipos (mantidos iguais ao backend)
@@ -45,6 +42,30 @@ export type TopArtista = {
   total_minutos?: number;
   imagem_url?: string | null;
 };
+
+// Ranking calculado pelo PRÓPRIO Spotify (endpoint oficial "Get User's Top
+// Items", GET /me/top/{type}) — diferente de TopArtista acima, que vem do
+// nosso histórico salvo no banco. Ver backend/src/services/spotifyService.js
+// (buscarTopItens) e GET /api/sync/top-spotify.
+export type TopSpotifyFaixa = {
+  id: string;
+  nome_faixa: string;
+  nome_artista: string;
+  nome_album: string | null;
+  imagem_capa_url: string | null;
+  duracao_ms: number;
+  popularity: number;
+};
+
+export type TopSpotifyArtista = {
+  id: string;
+  nome: string;
+  popularity: number;
+  generos: string[];
+  imagem_url: string | null;
+};
+
+export type PeriodoTopSpotify = "curto" | "medio" | "longo";
 
 export type HistoricoMensal = {
   mes: string;
@@ -184,6 +205,30 @@ export function useFaixasRecentes(limite = 8) {
     queryFn: () => api.get<FaixaRecente[]>(`/api/stats/recentes?limite=${limite}`),
     enabled: !!user,
     staleTime: RECENTES_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// ============================================================================
+// useTopSpotify — ranking do PRÓPRIO Spotify (não o calculado a partir do
+// nosso histórico salvo). 409 = usuário não tem o Spotify conectado; a UI
+// deve tratar isso como "esconder a seção", não como erro genérico.
+// ============================================================================
+export function useTopSpotify(
+  tipo: "faixas" | "artistas",
+  periodo: PeriodoTopSpotify = "medio",
+  limite = 5,
+) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["top-spotify", tipo, periodo, limite],
+    queryFn: () =>
+      api.get<(TopSpotifyFaixa | TopSpotifyArtista)[]>(
+        `/api/sync/top-spotify?tipo=${tipo}&periodo=${periodo}&limite=${limite}`,
+      ),
+    enabled: !!user,
+    staleTime: STATS_STALE_TIME_MS,
+    retry: false,
     refetchOnWindowFocus: false,
   });
 }
@@ -483,6 +528,34 @@ export function useCatalogoConquistas() {
   });
 }
 
+// Conquistas DINÂMICAS (por artista/faixa/gênero, ex: "100 Horas do Alec"):
+// diferente do catálogo fixo, o texto delas só existe depois de sabermos qual
+// é o artista/faixa/gênero de cada usuário — por isso vêm de um endpoint de
+// "preview" que já calcula atual/meta pra cada uma, desbloqueada ou não.
+// Ver backend/src/routes/perfilRoutes.js (GET /conquistas-dinamicas-preview)
+// e achievementsService.gerarPreviewConquistasDinamicas.
+export type ConquistaDinamicaPreview = {
+  chave: string;
+  titulo: string;
+  descricao: string;
+  raridade?: string;
+  desbloqueada: boolean;
+  atual: number;
+  meta: number;
+  metrica: string;
+};
+
+export function useConquistasDinamicasPreview() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["conquistas-dinamicas-preview"],
+    queryFn: () => api.get<ConquistaDinamicaPreview[]>("/api/perfil/conquistas-dinamicas-preview"),
+    enabled: !!user,
+    staleTime: CONQUISTAS_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export type ResultadoImportacao = {
   sucesso: boolean;
   faixas_novas: number;
@@ -551,7 +624,10 @@ export function usePreencherCapasFaltantes() {
 export function useApagarHistorico() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.delete<{ plays_apagadas: number; conquistas_apagadas: number }>("/api/sync/historico", { body: { confirmar: true } }),
+    mutationFn: () =>
+      api.delete<{ plays_apagadas: number; conquistas_apagadas: number }>("/api/sync/historico", {
+        confirmar: true,
+      }),
     onSuccess: () => {
       for (const key of [
         "resumo",
@@ -637,11 +713,23 @@ export function useRemoverAmigo() {
   });
 }
 
+export type RankingAmigoItem = {
+  usuario_id: string;
+  eu: boolean;
+  nome: string;
+  avatar_url: string | null;
+  total_minutos: number;
+  total_faixas: number;
+};
+
 export function useRankingAmigos(periodo?: "semana" | "mes" | "total") {
   const { user } = useAuth();
   return useQuery({
     queryKey: ["ranking-amigos", periodo],
-    queryFn: () => api.get<{ nome: string; total_minutos: number; total_faixas: number; eu: boolean }[]>(`/api/amigos/ranking${periodo ? `?periodo=${periodo}` : ""}`),
+    queryFn: () =>
+      api.get<RankingAmigoItem[]>(
+        `/api/amigos/ranking${periodo ? `?periodo=${periodo}` : ""}`,
+      ),
     enabled: !!user,
     staleTime: 2 * 60 * 1000,
   });
@@ -660,67 +748,6 @@ export function useComparacaoComAmigo(amigoId: string) {
 
 // ============================================================================
 // Wrapped (resumo anual tipo "Spotify Wrapped")
-// ============================================================================
-export type WrappedAlbum = {
-  nome_album: string;
-  nome_artista: string;
-  imagem_url: string | null;
-  total_plays: number;
-};
-
-export type WrappedFaixa = {
-  nome_faixa: string;
-  nome_artista: string;
-  imagem_url: string | null;
-  total_plays: number;
-};
-
-export type WrappedArtista = {
-  nome: string;
-  total_faixas: number;
-  imagem_url: string | null;
-};
-
-export type WrappedGenero = {
-  genero: string;
-  total_faixas: number;
-};
-
-export type WrappedPorMes = {
-  mes: string;
-  total_faixas: number;
-};
-
-export type Wrapped = {
-  ano: number;
-  tem_dados: boolean;
-  total_faixas: number;
-  total_minutos: number;
-  artistas_unicos: number;
-  albuns_unicos: number;
-  dias_ativos: number;
-  total_minutos_ano_anterior: number | null;
-  hora_favorita: string | null;
-  dia_favorito: string | null;
-  mes_favorito: string | null;
-  media_minutos_dia: number;
-  top_albuns: WrappedAlbum[];
-  top_faixas: WrappedFaixa[];
-  top_artistas: WrappedArtista[];
-  top_generos: WrappedGenero[];
-  por_mes: WrappedPorMes[];
-};
-
-export function useWrapped(ano: number) {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["wrapped", ano],
-    queryFn: () => api.get<Wrapped>(`/api/stats/wrapped?ano=${ano}`),
-    enabled: !!user,
-    staleTime: STATS_STALE_TIME_MS,
-    refetchOnWindowFocus: false,
-  });
-}
 // ============================================================================
 export type WrappedAlbum = {
   nome_album: string;

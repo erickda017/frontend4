@@ -16,7 +16,7 @@ import {
 
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { EmptyState, SkeletonCards } from "@/components/States";
-import { useComparacaoAmigo, type LadoComparacao } from "@/lib/queries";
+import { useComparacaoComAmigo, type LadoComparacao } from "@/lib/queries";
 
 export const Route = createFileRoute("/amigos/$amigoId")({
   head: () => ({
@@ -484,7 +484,7 @@ function PerfilAmigo({ amigo }: { amigo: LadoComparacao | undefined }) {
 
 function ComparacaoPage() {
   const { amigoId } = Route.useParams();
-  const { data, isLoading, isError, error } = useComparacaoAmigo(amigoId);
+  const { data, isLoading, isError, error } = useComparacaoComAmigo(amigoId);
 
   const eu = data?.eu;
   const amigo = data?.amigo;

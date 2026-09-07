@@ -5,6 +5,7 @@ import {
   Clock,
   Disc3,
   Download,
+  ListMusic,
   Loader2,
   Music4,
   Sparkles,
@@ -24,6 +25,8 @@ import { TempoEscutaCard } from "@/components/TempoEscutaCard";
 import { useProgressoUpload } from "@/hooks/use-progresso-upload";
 import {
   type PeriodoResumo,
+  type PeriodoTopSpotify,
+  type TopSpotifyFaixa,
   useAceitarAmigo,
   useAmigos,
   useConvidarAmigo,
@@ -39,7 +42,9 @@ import {
   useRankingAmigos,
   useRemoverAmigo,
   useSalvarPerfil,
+  useTopSpotify,
 } from "@/lib/queries";
+import { ApiError } from "@/lib/api";
 
 export const Route = createFileRoute("/perfil")({
   head: () => ({
@@ -107,6 +112,10 @@ function PerfilPage() {
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <GenerosCard />
         <HorasCard />
+      </div>
+
+      <div className="mt-6">
+        <TopSpotifyCard />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -486,6 +495,106 @@ function HorasCard() {
         <span>18h</span>
         <span>23h</span>
       </div>
+    </div>
+  );
+}
+
+const ROTULO_PERIODO_TOP_SPOTIFY: Record<PeriodoTopSpotify, string> = {
+  curto: "Últimas 4 semanas",
+  medio: "Últimos 6 meses",
+  longo: "Sempre",
+};
+
+/**
+ * Top 5 segundo o PRÓPRIO Spotify (endpoint oficial "Get User's Top Items"),
+ * não o ranking calculado localmente a partir do que já sincronizamos (esse
+ * já existe em outro lugar do app, vindo de /api/stats/top-faixas). Esse
+ * aqui reflete TODO o histórico de audição da conta, mesmo o que nunca
+ * passou pelo nosso auto-sync — por isso vale a pena mostrar os dois.
+ */
+function TopSpotifyCard() {
+  const [periodo, setPeriodo] = useState<PeriodoTopSpotify>("medio");
+  const { data, isLoading, isError, error } = useTopSpotify("faixas", periodo, 5);
+  const faixas = (data ?? []) as TopSpotifyFaixa[];
+
+  // 409 = Spotify não conectado. Não é uma falha de verdade, então some a
+  // seção em vez de mostrar um card de erro — quem não conectou Spotify não
+  // deveria ver isso como "algo quebrou".
+  const naoConectado = isError && error instanceof ApiError && error.status === 409;
+  if (naoConectado) return null;
+
+  return (
+    <div className="surface-card p-5">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-display text-lg font-bold">Top 5 segundo o Spotify</h3>
+        <div className="flex gap-1">
+          {(Object.keys(ROTULO_PERIODO_TOP_SPOTIFY) as PeriodoTopSpotify[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPeriodo(p)}
+              className={`rounded-full border px-2 py-1 text-[10px] font-medium transition-colors ${
+                periodo === p
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {ROTULO_PERIODO_TOP_SPOTIFY[p]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Ranking calculado pelo próprio Spotify a partir de toda a sua conta — pode diferir do que
+        você vê no resto do app, que é baseado só no que já foi sincronizado aqui.
+      </p>
+
+      {isLoading ? (
+        <SkeletonCards count={5} />
+      ) : isError ? (
+        <EmptyState
+          icon={ListMusic}
+          title="Não deu para buscar"
+          description="Tente de novo em alguns instantes."
+        />
+      ) : faixas.length === 0 ? (
+        <EmptyState
+          icon={ListMusic}
+          title="Sem dados suficientes"
+          description="O Spotify ainda não calculou um top para esse período."
+        />
+      ) : (
+        <ol className="space-y-2">
+          {faixas.map((f, i) => (
+            <li
+              key={f.id}
+              className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2 text-sm"
+            >
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                {i + 1}
+              </span>
+              <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
+                {f.imagem_capa_url ? (
+                  <img
+                    src={f.imagem_capa_url}
+                    alt={f.nome_album ?? f.nome_faixa}
+                    loading="lazy"
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <Disc3 className="size-4 text-muted-foreground" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{f.nome_faixa}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {f.nome_artista}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }
