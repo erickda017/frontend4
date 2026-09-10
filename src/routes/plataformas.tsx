@@ -26,12 +26,17 @@ import {
   useSincronizarPlataforma,
 } from "@/lib/queries";
 
-type BuscaPlataformas = { conectado?: string | undefined; erro?: string | undefined };
+type BuscaPlataformas = {
+  conectado?: string | undefined;
+  erro?: string | undefined;
+  detalhe?: string | undefined;
+};
 
 export const Route = createFileRoute("/plataformas")({
   validateSearch: (search: Record<string, unknown>): BuscaPlataformas => ({
     conectado: typeof search["conectado"] === "string" ? search["conectado"] : undefined,
     erro: typeof search["erro"] === "string" ? search["erro"] : undefined,
+    detalhe: typeof search["detalhe"] === "string" ? search["detalhe"] : undefined,
   }),
   head: () => ({
     meta: [
@@ -83,11 +88,19 @@ function Plataformas() {
   const desconectar = useDesconectarPlataforma();
   const sincronizar = useSincronizarPlataforma();
 
-  // Retorno do OAuth: o backend redireciona com ?conectado=spotify ou ?erro=...
+  // Retorno do OAuth: o backend redireciona com ?conectado=spotify ou
+  // ?erro=...&detalhe=... — "detalhe" (quando vem) é o motivo real do erro
+  // no backend (ver authRoutes.js), útil pra diagnosticar sem precisar
+  // abrir os logs do Render.
   useEffect(() => {
     if (busca.conectado) toast.success(`Conta ${busca.conectado} conectada com sucesso!`);
-    if (busca.erro) toast.error(MENSAGENS_ERRO[busca.erro] ?? "Não foi possível conectar.");
-  }, [busca.conectado, busca.erro]);
+    if (busca.erro) {
+      const mensagem = MENSAGENS_ERRO[busca.erro] ?? "Não foi possível conectar.";
+      toast.error(busca.detalhe ? `${mensagem} (${busca.detalhe})` : mensagem, {
+        duration: busca.detalhe ? 15000 : 4000,
+      });
+    }
+  }, [busca.conectado, busca.erro, busca.detalhe]);
 
   const usoPorChave = Object.fromEntries(comparacao.map((c) => [c.chave, c]));
   const chartData = comparacao.map((c) => ({
