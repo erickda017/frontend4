@@ -3,8 +3,22 @@ import { supabase } from "./supabase";
 // Aponta pro backend Node (Projeto B). Em dev, o Node roda em localhost:3000
 // por padrão (ver PORT em projB/.env). Configure em .env do front:
 //   VITE_API_URL=http://localhost:3000
-export const API_URL =
-  (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:3000";
+const apiUrlConfigurada = import.meta.env["VITE_API_URL"] as string | undefined;
+
+if (!apiUrlConfigurada) {
+  // Sem isso, um VITE_API_URL ausente/errado no build da Vercel falha em
+  // silêncio: o bundle de produção tenta falar com localhost:3000 (nada no
+  // navegador de quem visita o site), toda chamada falha, e as páginas só
+  // mostram estados vazios genéricos — sem nenhuma pista de que a causa é
+  // uma env var esquecida no build.
+  console.error(
+    "[api] VITE_API_URL não configurada — usando http://localhost:3000 como fallback. " +
+      "Isso só funciona em desenvolvimento local; em produção (Vercel), configure " +
+      "VITE_API_URL apontando para o backend (Render) antes do build.",
+  );
+}
+
+export const API_URL = apiUrlConfigurada ?? "http://localhost:3000";
 
 export class ApiError extends Error {
   status: number;
@@ -25,6 +39,20 @@ async function authHeader(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// O backend só devolve 401 quando exigirLogin() rejeita o token (ausente,
+// expirado ou inválido) — nunca por outro motivo de negócio. Sem isso, uma
+// sessão morta (ex: aba aberta por dias, refresh token revogado) fazia toda
+// chamada falhar em silêncio: as páginas só checavam "carregando", nunca
+// "erro", então o usuário via a conta como vazia sem nenhum caminho de volta
+// pro login. Chamar signOut() aqui dispara o onAuthStateChange do
+// AuthProvider, que zera a sessão — o AppShell já redireciona pra /login
+// sozinho assim que `user` vira null (ver AppShell.tsx).
+function tratarSessaoInvalidaSeNecessario(status: number) {
+  if (status === 401) {
+    void supabase.auth.signOut();
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = {
     "Content-Type": "application/json",
@@ -40,6 +68,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const body = isJson ? await res.json().catch(() => null) : null;
 
   if (!res.ok) {
+    tratarSessaoInvalidaSeNecessario(res.status);
     const message = body?.erro || `Erro ${res.status} ao chamar ${path}`;
     const retryAfterHeader = res.headers.get("Retry-After");
     const retryAfter = retryAfterHeader ? Number(retryAfterHeader) : null;
@@ -97,6 +126,7 @@ export const api = {
 
     const body = await res.json().catch(() => null);
     if (!res.ok) {
+      tratarSessaoInvalidaSeNecessario(res.status);
       throw new ApiError(res.status, body?.erro || `Erro ${res.status} ao enviar arquivos`);
     }
     return body as T;
@@ -119,6 +149,7 @@ export const api = {
 
     const body = await res.json().catch(() => null);
     if (!res.ok) {
+      tratarSessaoInvalidaSeNecessario(res.status);
       throw new ApiError(res.status, body?.erro || `Erro ${res.status} ao enviar arquivo`);
     }
     return body as T;
@@ -133,6 +164,7 @@ export const api = {
   download: async (path: string, nomeArquivoPadrao: string): Promise<void> => {
     const res = await fetch(`${API_URL}${path}`, { headers: await authHeader() });
     if (!res.ok) {
+      tratarSessaoInvalidaSeNecessario(res.status);
       const body = await res.json().catch(() => null);
       throw new ApiError(res.status, body?.erro || `Erro ${res.status} ao baixar ${path}`);
     }

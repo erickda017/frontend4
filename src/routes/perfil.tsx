@@ -19,7 +19,7 @@ import { toast } from "sonner";
 
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { CampoImagem } from "@/components/CampoImagem";
-import { EmptyState, SkeletonCards } from "@/components/States";
+import { EmptyState, ErrorState, SkeletonCards } from "@/components/States";
 import { StatCard } from "@/components/StatCard";
 import { TempoEscutaCard } from "@/components/TempoEscutaCard";
 import { useProgressoUpload } from "@/hooks/use-progresso-upload";
@@ -77,7 +77,7 @@ function formatarData(valor: string | null) {
 }
 
 function PerfilPage() {
-  const { data: perfil, isLoading } = usePerfil();
+  const { data: perfil, isLoading, isError, refetch } = usePerfil();
   const exportar = useExportarHistorico();
 
   return (
@@ -87,7 +87,19 @@ function PerfilPage() {
         subtitle="Suas informações, importação de histórico e amigos — tudo junto."
       />
 
-      {isLoading ? <SkeletonCards /> : <CartaoPerfil />}
+      {isLoading ? (
+        <SkeletonCards />
+      ) : isError ? (
+        <div className="surface-card">
+          <ErrorState
+            title="Não consegui carregar seu perfil"
+            description="Confira sua conexão e tente de novo."
+            onRetry={() => refetch()}
+          />
+        </div>
+      ) : (
+        <CartaoPerfil />
+      )}
 
       <div className="surface-card mt-6 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
