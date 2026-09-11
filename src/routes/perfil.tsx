@@ -8,6 +8,7 @@ import {
   ListMusic,
   Loader2,
   Music4,
+  Smartphone,
   Sparkles,
   Trophy,
   Upload,
@@ -44,7 +45,7 @@ import {
   useSalvarPerfil,
   useTopSpotify,
 } from "@/lib/queries";
-import { ApiError } from "@/lib/api";
+import { API_URL, ApiError } from "@/lib/api";
 
 export const Route = createFileRoute("/perfil")({
   head: () => ({
@@ -173,6 +174,32 @@ function PerfilPage() {
         </div>
 
         <RestaurarBackup />
+      </div>
+
+      <div className="surface-card mt-6 p-5">
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
+            <Smartphone className="size-5" />
+          </span>
+          <div>
+            <p className="font-semibold">App Android (Sonora Listener)</p>
+            <p className="text-xs text-muted-foreground">
+              Captura o que você ouve em qualquer app de música do celular (ex: YouTube
+              Music) e manda pro seu histórico aqui. Sempre a versão mais recente.
+            </p>
+          </div>
+        </div>
+        <a
+          href={`${API_URL}/downloads/sonora-listener.apk`}
+          className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium"
+        >
+          <Download className="size-3.5" />
+          Baixar APK
+        </a>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          É um APK fora da Play Store — o Android vai avisar disso na instalação, é
+          esperado. Depois de instalar, veja as instruções no próprio app.
+        </p>
       </div>
 
       {perfil ? (
