@@ -685,7 +685,7 @@ export function useAmigos() {
     queryKey: ["amigos"],
     queryFn: () => api.get<Amizade[]>("/api/amigos"),
     enabled: !!user,
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 }
 
@@ -731,7 +731,7 @@ export function useRankingAmigos(periodo?: "semana" | "mes" | "total") {
         `/api/amigos/ranking${periodo ? `?periodo=${periodo}` : ""}`,
       ),
     enabled: !!user,
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 }
 
@@ -741,7 +741,7 @@ export function useComparacaoComAmigo(amigoId: string) {
     queryKey: ["comparacao-amigo", amigoId],
     queryFn: () => api.get<Comparacao>(`/api/amigos/${amigoId}/comparacao`),
     enabled: !!user && !!amigoId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
 }

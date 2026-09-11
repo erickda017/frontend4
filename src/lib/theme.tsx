@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 // ----------------------------------------------------------------------------
 
 export const TEMAS = [
-  { id: "sonora", nome: "Sonora", descricao: "Verde neon sobre roxo profundo" },
+  { id: "sonora", nome: "Sonora", descricao: "Esmeralda e dourado sobre grafite escuro" },
   { id: "dark-neon", nome: "Dark Neon", descricao: "Preto absoluto com cyan e magenta" },
   { id: "violeta", nome: "Violeta", descricao: "Roxo-violeta vibrante, escuro do começo ao fim" },
   { id: "rosa", nome: "Rosa", descricao: "Rosa quente com brilho coral" },

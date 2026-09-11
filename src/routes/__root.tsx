@@ -1,4 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import {
   Outlet,
   Link,
@@ -12,6 +13,12 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth-context";
 import { ThemeProvider } from "../lib/theme";
 import { Toaster } from "../components/ui/sonner";
+import {
+  queryPersister,
+  devePersistirQuery,
+  QUERY_CACHE_BUSTER,
+  QUERY_CACHE_MAX_AGE_MS,
+} from "../lib/query-persister";
 
 function NotFoundComponent() {
   return (
@@ -100,7 +107,17 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister: queryPersister,
+        maxAge: QUERY_CACHE_MAX_AGE_MS,
+        buster: QUERY_CACHE_BUSTER,
+        dehydrateOptions: {
+          shouldDehydrateQuery: (query) => devePersistirQuery(query.queryKey),
+        },
+      }}
+    >
       <ThemeProvider>
         <AuthProvider>
           <HeadContent />
@@ -109,6 +126,6 @@ function RootComponent() {
           <Toaster position="top-center" />
         </AuthProvider>
       </ThemeProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

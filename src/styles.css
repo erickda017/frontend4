@@ -42,42 +42,47 @@
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Tema padrão ("Sonora"): esmeralda + dourado sobre grafite escuro quase
+   neutro — antes o fundo (roxo), o primário (verde) e o acento (rosa) eram
+   três famílias de cor competindo entre si. Reduzido a duas famílias que se
+   complementam (verde-azulado frio + dourado quente), com o fundo/superfícies
+   na MESMA família do primário em vez de uma quarta cor à parte. */
 :root {
   --radius: 0.9rem;
-  --background: oklch(0.16 0.03 275);
-  --foreground: oklch(0.97 0.01 280);
-  --surface: oklch(0.21 0.035 278);
-  --surface-2: oklch(0.25 0.04 280);
-  --card: oklch(0.21 0.035 278);
-  --card-foreground: oklch(0.97 0.01 280);
-  --popover: oklch(0.21 0.035 278);
-  --popover-foreground: oklch(0.97 0.01 280);
-  --primary: oklch(0.79 0.19 155);
-  --primary-foreground: oklch(0.18 0.04 160);
-  --secondary: oklch(0.27 0.045 280);
-  --secondary-foreground: oklch(0.96 0.01 280);
-  --muted: oklch(0.26 0.035 280);
-  --muted-foreground: oklch(0.72 0.03 285);
-  --accent: oklch(0.72 0.2 350);
-  --accent-foreground: oklch(0.16 0.03 275);
+  --background: oklch(0.15 0.022 205);
+  --foreground: oklch(0.97 0.01 205);
+  --surface: oklch(0.2 0.028 205);
+  --surface-2: oklch(0.245 0.032 203);
+  --card: oklch(0.2 0.028 205);
+  --card-foreground: oklch(0.97 0.01 205);
+  --popover: oklch(0.2 0.028 205);
+  --popover-foreground: oklch(0.97 0.01 205);
+  --primary: oklch(0.78 0.15 172);
+  --primary-foreground: oklch(0.16 0.04 172);
+  --secondary: oklch(0.27 0.032 205);
+  --secondary-foreground: oklch(0.96 0.01 205);
+  --muted: oklch(0.26 0.028 205);
+  --muted-foreground: oklch(0.72 0.025 205);
+  --accent: oklch(0.8 0.15 88);
+  --accent-foreground: oklch(0.18 0.03 205);
   --destructive: oklch(0.63 0.23 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.31 0.04 282);
-  --input: oklch(0.31 0.04 282);
-  --ring: oklch(0.79 0.19 155);
-  --chart-1: oklch(0.79 0.19 155);
-  --chart-2: oklch(0.72 0.2 350);
-  --chart-3: oklch(0.75 0.17 60);
-  --chart-4: oklch(0.68 0.16 250);
-  --chart-5: oklch(0.8 0.14 200);
+  --border: oklch(0.32 0.032 205);
+  --input: oklch(0.32 0.032 205);
+  --ring: oklch(0.78 0.15 172);
+  --chart-1: oklch(0.78 0.15 172);
+  --chart-2: oklch(0.8 0.15 88);
+  --chart-3: oklch(0.72 0.19 300);
+  --chart-4: oklch(0.75 0.19 15);
+  --chart-5: oklch(0.7 0.15 230);
   --gradient-hero: linear-gradient(
     135deg,
-    oklch(0.79 0.19 155 / 0.22),
-    oklch(0.72 0.2 350 / 0.18) 55%,
+    oklch(0.78 0.15 172 / 0.22),
+    oklch(0.8 0.15 88 / 0.18) 55%,
     transparent
   );
-  --gradient-brand: linear-gradient(100deg, oklch(0.79 0.19 155), oklch(0.72 0.2 350));
-  --shadow-glow: 0 20px 60px -20px oklch(0.79 0.19 155 / 0.35);
+  --gradient-brand: linear-gradient(100deg, oklch(0.78 0.15 172), oklch(0.8 0.15 88));
+  --shadow-glow: 0 20px 60px -20px oklch(0.78 0.15 172 / 0.35);
 }
 
 .dark {
