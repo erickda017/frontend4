@@ -410,7 +410,6 @@ export type Perfil = {
   avatar_url: string | null;
   banner_url: string | null;
   membro_desde: string | null;
-  resumo: Resumo;
   total_conquistas: number;
   total_plataformas: number;
 };

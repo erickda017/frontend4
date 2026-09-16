@@ -42,6 +42,7 @@ import {
   usePreencherCapasFaltantes,
   useRankingAmigos,
   useRemoverAmigo,
+  useResumo,
   useSalvarPerfil,
   useTopSpotify,
 } from "@/lib/queries";
@@ -297,6 +298,14 @@ function BotaoPreencherCapas() {
 
 function CartaoPerfil() {
   const { data: perfil } = usePerfil();
+  // Mesma rota/cache que a tela principal (useResumo) - antes esse card lia
+  // o "resumo" embutido em GET /api/perfil, uma query separada da que a
+  // Home usa (GET /api/stats/resumo), com staleness e invalidação próprias.
+  // O número era o mesmo no banco, mas cada tela podia mostrar um valor
+  // "congelado" diferente dependendo de qual cache tinha atualizado por
+  // último. Usando o mesmo hook aqui, as duas telas sempre leem a mesma
+  // entrada do React Query.
+  const { data: resumo } = useResumo("total");
   const salvar = useSalvarPerfil();
   const [editando, setEditando] = useState(false);
   const [nome, setNome] = useState("");
@@ -444,13 +453,13 @@ function CartaoPerfil() {
       <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Faixas"
-          value={(perfil.resumo?.totalFaixas ?? 0).toLocaleString("pt-BR")}
+          value={(resumo?.totalFaixas ?? 0).toLocaleString("pt-BR")}
           icon={Music4}
         />
-        <TempoEscutaCard totalMinutos={perfil.resumo?.totalMinutos} />
+        <TempoEscutaCard totalMinutos={resumo?.totalMinutos} />
         <StatCard
           label="Artistas"
-          value={String(perfil.resumo?.artistasUnicos ?? 0)}
+          value={String(resumo?.artistasUnicos ?? 0)}
           icon={Disc3}
         />
         <StatCard label="Conquistas" value={String(perfil.total_conquistas ?? 0)} icon={Trophy} />
