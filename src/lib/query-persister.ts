@@ -27,9 +27,14 @@ export function devePersistirQuery(queryKey: readonly unknown[]): boolean {
 }
 
 // Bump quando uma mudança no formato das respostas da API tornar o cache
-// salvo incompatível (evita que dados persistidos antigos quebrem a tela) —
-// qualquer valor persistido com um "buster" diferente do atual é descartado.
-export const QUERY_CACHE_BUSTER = "v1";
+// salvo incompatível, OU quando um bug real tiver deixado ERROS salvos no
+// cache de alguém (ver shouldDehydrateQuery em __root.tsx - antes não
+// filtrava por status "success", então um 500 do backend podia ficar
+// "congelado" no localStorage de quem já tinha aberto o site com o bug
+// ativo, mesmo depois do backend corrigido) — qualquer valor persistido com
+// um "buster" diferente do atual é descartado, forçando tudo a buscar de
+// novo uma vez.
+export const QUERY_CACHE_BUSTER = "v2";
 
 // Quanto tempo um cache persistido continua válido sem visitar o site
 // (depois disso, é descartado e a primeira busca acontece normalmente).

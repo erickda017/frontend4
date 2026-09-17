@@ -114,7 +114,17 @@ function RootComponent() {
         maxAge: QUERY_CACHE_MAX_AGE_MS,
         buster: QUERY_CACHE_BUSTER,
         dehydrateOptions: {
-          shouldDehydrateQuery: (query) => devePersistirQuery(query.queryKey),
+          // "status === success" é o padrão do próprio React Query
+          // (defaultShouldDehydrateQuery) - devePersistirQuery() sozinha só
+          // filtrava por CHAVE, sem olhar o status, então uma query que
+          // tivesse falhado (erro de rede, bug no backend, etc.) ficava
+          // salva no localStorage como erro por até QUERY_CACHE_MAX_AGE_MS.
+          // Isso já causou um bug real: depois de corrigir um erro 500 no
+          // backend (ver "Fix divisão por gênero"), quem já tinha aberto o
+          // site antes continuava vendo "sem dados", porque o navegador
+          // restaurava o ERRO antigo do cache em vez de tentar de novo.
+          shouldDehydrateQuery: (query) =>
+            query.state.status === "success" && devePersistirQuery(query.queryKey),
         },
       }}
     >
