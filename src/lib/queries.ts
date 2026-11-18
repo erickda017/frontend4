@@ -7,7 +7,13 @@
 // 3. Interface de configuração centralizada em optimizacao-config.ts
 // 4. Para queries que podem disparar em paralelo, configuração de gargalo
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api, API_URL, ApiError } from "./api";
 import { useAuth } from "./auth-context";
 import {
@@ -128,12 +134,63 @@ export type FaixaRecente = {
 
 // Catálogo de conquistas (mantido no frontend para mostrar bloqueadas)
 export const CATALOGO_CONQUISTAS = [
-  { chave: "primeira_musica", titulo: "Primeiro Play", descricao: "Você conectou uma plataforma e sincronizou sua primeira música!", raridade: "comum" },
-  { chave: "cem_faixas", titulo: "Maratonista Musical", descricao: "Você já ouviu 100 faixas registradas no Music Hub.", raridade: "comum" },
-  { chave: "mil_faixas", titulo: "Mil e Uma Músicas", descricao: "Uau! 1.000 faixas no seu histórico.", raridade: "rara" },
-  { chave: "dez_artistas", titulo: "Explorador Sonoro", descricao: "Você já ouviu pelo menos 10 artistas diferentes.", raridade: "comum" },
-  { chave: "cem_horas", titulo: "Cem Horas de Som", descricao: "Mais de 6.000 minutos (100 horas) de música ouvida.", raridade: "epica" },
+  {
+    chave: "primeira_musica",
+    titulo: "Primeiro Play",
+    descricao: "Você conectou uma plataforma e sincronizou sua primeira música!",
+    raridade: "comum",
+  },
+  {
+    chave: "cem_faixas",
+    titulo: "Maratonista Musical",
+    descricao: "Você já ouviu 100 faixas registradas no Music Hub.",
+    raridade: "comum",
+  },
+  {
+    chave: "mil_faixas",
+    titulo: "Mil e Uma Músicas",
+    descricao: "Uau! 1.000 faixas no seu histórico.",
+    raridade: "rara",
+  },
+  {
+    chave: "dez_artistas",
+    titulo: "Explorador Sonoro",
+    descricao: "Você já ouviu pelo menos 10 artistas diferentes.",
+    raridade: "comum",
+  },
+  {
+    chave: "cem_horas",
+    titulo: "Cem Horas de Som",
+    descricao: "Mais de 6.000 minutos (100 horas) de música ouvida.",
+    raridade: "epica",
+  },
 ] as const;
+
+// Chaves que mudam quando o histórico muda (sync, importação, apagar...).
+// Centralizado: antes cada mutation repetia (e esquecia) uma lista diferente.
+const CHAVES_DEPENDENTES_DO_HISTORICO = [
+  "resumo",
+  "recentes",
+  "historico",
+  "top-artistas",
+  "historico-mensal",
+  "comparacao-plataformas",
+  "conquistas",
+  "conquistas-dinamicas-preview",
+  "metas-progresso",
+  "generos",
+  "por-hora",
+  "perfil",
+  "wrapped",
+  "recap-mensal",
+  "recap-meses",
+] as const;
+
+function invalidarDadosDoHistorico(queryClient: ReturnType<typeof useQueryClient>) {
+  for (const key of CHAVES_DEPENDENTES_DO_HISTORICO) {
+    queryClient.invalidateQueries({ queryKey: [key] });
+  }
+}
 
 export type PeriodoResumo = "total" | "semana" | "mes";
 
@@ -205,6 +262,40 @@ export function useFaixasRecentes(limite = 8) {
     queryFn: () => api.get<FaixaRecente[]>(`/api/stats/recentes?limite=${limite}`),
     enabled: !!user,
     staleTime: RECENTES_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// ============================================================================
+// Histórico PAGINADO no servidor (busca + filtro no banco). Substitui o antigo
+// "carregar tudo" — abrir a tela custa 1 página (50 linhas) em vez do
+// histórico inteiro. Não é persistido em localStorage (ver query-persister).
+// ============================================================================
+export type PaginaHistorico = {
+  itens: FaixaRecente[];
+  pagina: number;
+  limite: number;
+  tem_mais: boolean;
+  total: number | null;
+};
+
+export function useHistoricoPaginado(filtros: { busca: string; plataforma: string }, limite = 50) {
+  const { user } = useAuth();
+  return useInfiniteQuery({
+    queryKey: ["historico", filtros.busca, filtros.plataforma, limite],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ pagina: String(pageParam), limite: String(limite) });
+      if (filtros.busca) params.set("q", filtros.busca);
+      if (filtros.plataforma && filtros.plataforma !== "all")
+        params.set("plataforma", filtros.plataforma);
+      return api.get<PaginaHistorico>(`/api/stats/historico?${params.toString()}`);
+    },
+    getNextPageParam: (ultima) => (ultima.tem_mais ? ultima.pagina + 1 : undefined),
+    enabled: !!user,
+    staleTime: RECENTES_STALE_TIME_MS,
+    // Mantém a lista antiga na tela enquanto a nova busca carrega (sem "piscar").
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
   });
 }
@@ -383,19 +474,7 @@ export function useSincronizarPlataforma() {
     mutationFn: (chave: string) => api.post<ResultadoSync>(`/api/sync/${chave}`),
     onSuccess: () => {
       // Invalidar somente as queries que mudam com sync
-      for (const key of [
-        "resumo",
-        "recentes",
-        "top-artistas",
-        "historico-mensal",
-        "comparacao-plataformas",
-        "conquistas",
-        "metas-progresso",
-        "generos",
-        "por-hora",
-      ]) {
-        queryClient.invalidateQueries({ queryKey: [key] });
-      }
+      invalidarDadosDoHistorico(queryClient);
     },
   });
 }
@@ -479,14 +558,29 @@ export type LadoComparacao = {
   ultima_reproducao: string | null;
   top_artistas: { nome: string; total: number; imagem_url: string | null }[];
   top_generos: { nome: string; total: number }[];
-  top_faixas: { nome_faixa: string; nome_artista: string; imagem_url: string | null; total: number }[];
-  top_albuns: { nome_album: string; nome_artista: string; imagem_url: string | null; total: number }[];
+  top_faixas: {
+    nome_faixa: string;
+    nome_artista: string;
+    imagem_url: string | null;
+    total: number;
+  }[];
+  top_albuns: {
+    nome_album: string;
+    nome_artista: string;
+    imagem_url: string | null;
+    total: number;
+  }[];
 };
 
 export type Comparacao = {
   compatibilidade: number;
   compatibilidade_generos: number;
-  artistas_em_comum: { nome: string; imagem_url: string | null; minhas_reproducoes: number; reproducoes_amigo: number }[];
+  artistas_em_comum: {
+    nome: string;
+    imagem_url: string | null;
+    minhas_reproducoes: number;
+    reproducoes_amigo: number;
+  }[];
   total_artistas_em_comum: number;
   faixas_em_comum: number;
   faixas_em_comum_detalhe: FaixaComparada[];
@@ -566,23 +660,11 @@ export type ResultadoImportacao = {
 export function useImportarHistoricoSpotify() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (arquivos: File[]) => api.upload<ResultadoImportacao>("/api/sync/historico-completo", arquivos),
+    mutationFn: (arquivos: File[]) =>
+      api.upload<ResultadoImportacao>("/api/sync/historico-completo", arquivos),
     onSuccess: () => {
       // Invalidar todas as queries de estatísticas após importação
-      for (const key of [
-        "resumo",
-        "recentes",
-        "top-artistas",
-        "historico-mensal",
-        "comparacao-plataformas",
-        "conquistas",
-        "metas-progresso",
-        "generos",
-        "por-hora",
-        "perfil",
-      ]) {
-        queryClient.invalidateQueries({ queryKey: [key] });
-      }
+      invalidarDadosDoHistorico(queryClient);
     },
   });
 }
@@ -593,19 +675,7 @@ export function useImportarHistoricoYoutubeMusic() {
     mutationFn: (arquivos: File[]) =>
       api.upload<ResultadoImportacao>("/api/sync/historico-completo-youtube-music", arquivos),
     onSuccess: () => {
-      for (const key of [
-        "resumo",
-        "recentes",
-        "top-artistas",
-        "historico-mensal",
-        "comparacao-plataformas",
-        "conquistas",
-        "metas-progresso",
-        "generos",
-        "por-hora",
-      ]) {
-        queryClient.invalidateQueries({ queryKey: [key] });
-      }
+      invalidarDadosDoHistorico(queryClient);
     },
   });
 }
@@ -613,7 +683,10 @@ export function useImportarHistoricoYoutubeMusic() {
 export function usePreencherCapasFaltantes() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post<{ sucesso: boolean; capas_atualizadas: number; faixas_unicas_sem_capa: number }>("/api/sync/preencher-capas"),
+    mutationFn: () =>
+      api.post<{ sucesso: boolean; capas_atualizadas: number; faixas_unicas_sem_capa: number }>(
+        "/api/sync/preencher-capas",
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["perfil"] });
     },
@@ -628,20 +701,7 @@ export function useApagarHistorico() {
         confirmar: true,
       }),
     onSuccess: () => {
-      for (const key of [
-        "resumo",
-        "recentes",
-        "top-artistas",
-        "historico-mensal",
-        "comparacao-plataformas",
-        "conquistas",
-        "metas-progresso",
-        "generos",
-        "por-hora",
-        "perfil",
-      ]) {
-        queryClient.invalidateQueries({ queryKey: [key] });
-      }
+      invalidarDadosDoHistorico(queryClient);
     },
   });
 }
@@ -649,21 +709,10 @@ export function useApagarHistorico() {
 export function useImportarBackupProprio() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (arquivo: File) => api.uploadUnico<ResultadoImportacao>("/api/sync/importar-backup", arquivo),
+    mutationFn: (arquivo: File) =>
+      api.uploadUnico<ResultadoImportacao>("/api/sync/importar-backup", arquivo),
     onSuccess: () => {
-      for (const key of [
-        "resumo",
-        "recentes",
-        "top-artistas",
-        "historico-mensal",
-        "comparacao-plataformas",
-        "conquistas",
-        "metas-progresso",
-        "generos",
-        "por-hora",
-      ]) {
-        queryClient.invalidateQueries({ queryKey: [key] });
-      }
+      invalidarDadosDoHistorico(queryClient);
     },
   });
 }
@@ -671,7 +720,8 @@ export function useImportarBackupProprio() {
 export function useExportarHistorico() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (formato: "csv" | "json") => api.download(`/api/stats/exportar?formato=${formato}`, `historico.${formato}`),
+    mutationFn: (formato: "csv" | "json") =>
+      api.download(`/api/stats/exportar?formato=${formato}`, `historico.${formato}`),
     onSuccess: () => {
       // Não invalida nada — exportação é apenas download
     },
@@ -726,9 +776,7 @@ export function useRankingAmigos(periodo?: "semana" | "mes" | "total") {
   return useQuery({
     queryKey: ["ranking-amigos", periodo],
     queryFn: () =>
-      api.get<RankingAmigoItem[]>(
-        `/api/amigos/ranking${periodo ? `?periodo=${periodo}` : ""}`,
-      ),
+      api.get<RankingAmigoItem[]>(`/api/amigos/ranking${periodo ? `?periodo=${periodo}` : ""}`),
     enabled: !!user,
     staleTime: Infinity,
   });
@@ -765,6 +813,8 @@ export type WrappedFaixa = {
 export type WrappedArtista = {
   nome: string;
   total_faixas: number;
+  total_minutos?: number;
+  percentual?: number;
   imagem_url: string | null;
 };
 
@@ -776,6 +826,103 @@ export type WrappedGenero = {
 export type WrappedPorMes = {
   mes: string;
   total_faixas: number;
+};
+
+export type RecapPersonalidade = { chave: string; titulo: string; descricao: string };
+export type RecapDestaque = { chave: string; titulo: string; texto: string };
+
+export type Recap = {
+  tem_dados: boolean;
+  tipo?: "mes" | "ano";
+  // Só no recap mensal:
+  mes?: string;
+  rotulo?: string;
+  disponivel?: boolean;
+  libera_em?: string;
+  dias_restantes?: number;
+  por_semana?: { semana: number; total_faixas: number; total_minutos: number }[];
+  total_faixas?: number;
+  total_minutos?: number;
+  total_horas?: number;
+  artistas_unicos?: number;
+  albuns_unicos?: number;
+  faixas_unicas?: number;
+  generos_unicos?: number;
+  dias_ativos?: number;
+  dias_no_periodo?: number;
+  media_minutos_dia?: number;
+  top_artistas?: WrappedArtista[];
+  top_faixas?: (WrappedFaixa & { total_minutos?: number })[];
+  top_albuns?: WrappedAlbum[];
+  top_generos?: (WrappedGenero & { percentual?: number; total_minutos?: number })[];
+  musica_do_periodo?: {
+    nome_faixa: string;
+    nome_artista: string;
+    imagem_url: string | null;
+    total_plays: number;
+    total_minutos: number;
+    primeira_vez: string;
+    ultima_vez: string;
+    dia_de_pico: string | null;
+  } | null;
+  artista_do_periodo?: {
+    nome: string;
+    imagem_url: string | null;
+    total_plays: number;
+    total_minutos: number;
+    percentual: number;
+  } | null;
+  hora_favorita?: string | null;
+  dia_favorito?: string | null;
+  mes_favorito?: string | null;
+  por_hora?: { hora: string; total: number }[];
+  por_dia_semana?: { dia: string; total: number }[];
+  periodos_do_dia?: { madrugada: number; manha: number; tarde: number; noite: number };
+  dia_mais_intenso?: {
+    dia: string;
+    total_faixas: number;
+    total_minutos: number;
+    artista_top: string | null;
+  } | null;
+  maior_sequencia_dias?: number;
+  sessao_mais_longa?: { inicio: string; minutos: number; total_faixas: number } | null;
+  obsessao?: {
+    nome_faixa: string;
+    nome_artista: string;
+    imagem_url: string | null;
+    dia: string;
+    vezes: number;
+  } | null;
+  calendario?: { dia: string; total_faixas: number; total_minutos: number }[];
+  taxa_repeticao?: number;
+  fidelidade_top_artista?: number;
+  descobertas?: string[];
+  personalidade?: RecapPersonalidade | null;
+  comparacao?: {
+    minutos_anterior: number;
+    faixas_anterior: number;
+    variacao_minutos_pct: number | null;
+    variacao_faixas_pct: number | null;
+  };
+  destaques?: RecapDestaque[];
+  por_mes?: { mes: string; total_faixas: number; total_minutos?: number }[];
+};
+
+export type RecapMes = {
+  mes: string;
+  rotulo: string;
+  total_faixas: number;
+  total_minutos: number;
+  disponivel: boolean;
+  libera_em: string;
+  dias_restantes: number;
+};
+
+export type PreviaFaixa = {
+  preview_url: string | null;
+  fonte?: string;
+  link?: string | null;
+  capa?: string | null;
 };
 
 export type Wrapped = {
@@ -796,7 +943,24 @@ export type Wrapped = {
   top_artistas: WrappedArtista[];
   top_generos: WrappedGenero[];
   por_mes: WrappedPorMes[];
-};
+} & Omit<
+  Recap,
+  | "tem_dados"
+  | "por_mes"
+  | "top_albuns"
+  | "top_faixas"
+  | "top_artistas"
+  | "top_generos"
+  | "total_faixas"
+  | "total_minutos"
+  | "artistas_unicos"
+  | "albuns_unicos"
+  | "dias_ativos"
+  | "hora_favorita"
+  | "dia_favorito"
+  | "mes_favorito"
+  | "media_minutos_dia"
+>;
 
 export function useWrapped(ano: number) {
   const { user } = useAuth();
@@ -805,6 +969,47 @@ export function useWrapped(ano: number) {
     queryFn: () => api.get<Wrapped>(`/api/stats/wrapped?ano=${ano}`),
     enabled: !!user,
     staleTime: STATS_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// ============================================================================
+// Recap MENSAL — libera no último dia do mês (e fica disponível depois)
+// ============================================================================
+export function useRecapMeses() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["recap-meses"],
+    queryFn: () => api.get<RecapMes[]>("/api/stats/recap/meses"),
+    enabled: !!user,
+    staleTime: STATS_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useRecapMensal(mes: string | null) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["recap-mensal", mes ?? "ultimo"],
+    queryFn: () => api.get<Recap>(`/api/stats/recap/mensal${mes ? `?mes=${mes}` : ""}`),
+    enabled: !!user,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** Prévia oficial de 30s da música do mês (tocada direto da fonte, sem baixar). */
+export function usePreviaFaixa(faixa: string | undefined, artista: string | undefined) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["recap-previa", faixa, artista],
+    queryFn: () =>
+      api.get<PreviaFaixa>(
+        `/api/stats/recap/previa?faixa=${encodeURIComponent(faixa ?? "")}&artista=${encodeURIComponent(artista ?? "")}`,
+      ),
+    enabled: !!user && !!faixa,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: false,
     refetchOnWindowFocus: false,
   });
 }

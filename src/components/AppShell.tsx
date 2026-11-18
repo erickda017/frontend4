@@ -5,6 +5,7 @@ import {
   History,
   Layers,
   LogOut,
+  Sparkles,
   Target,
   Trophy,
   User,
@@ -37,6 +38,7 @@ const nav = [
   { to: "/historico", label: "Histórico", icon: History },
   { to: "/plataformas", label: "Plataformas", icon: Layers },
   { to: "/metas", label: "Metas", icon: Target },
+  { to: "/wrapped", label: "Recap", icon: Sparkles },
   { to: "/conquistas", label: "Conquistas", icon: Trophy },
   { to: "/perfil", label: "Perfil", icon: User },
 ];

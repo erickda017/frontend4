@@ -4,7 +4,7 @@ import { Disc3, Music4, Search } from "lucide-react";
 
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { EmptyState, ErrorState, SkeletonList } from "@/components/States";
-import { useFaixasRecentes, usePerfilPlataformas } from "@/lib/queries";
+import { useHistoricoPaginado, usePerfilPlataformas } from "@/lib/queries";
 
 export const Route = createFileRoute("/historico")({
   head: () => ({
@@ -29,35 +29,41 @@ export const Route = createFileRoute("/historico")({
 
 const PAGINA = 50;
 
+/** Atrasa o valor até o usuário parar de digitar (evita 1 chamada por tecla). */
+function useDebounce<T>(valor: T, ms: number): T {
+  const [atrasado, setAtrasado] = useState(valor);
+  useEffect(() => {
+    const id = setTimeout(() => setAtrasado(valor), ms);
+    return () => clearTimeout(id);
+  }, [valor, ms]);
+  return atrasado;
+}
+
 function Historico() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<string | "all">("all");
-  const [visiveis, setVisiveis] = useState(PAGINA);
+  const busca = useDebounce(query.trim(), 350);
 
-  // limite 0 = ILIMITADO: a página de histórico carrega TODAS as reproduções
-  // (o painel continua usando só as últimas 5).
-  const { data: history = [], isLoading, isError, refetch } = useFaixasRecentes(0);
+  // PERFORMANCE: paginação, busca e filtro por plataforma acontecem NO SERVIDOR.
+  // Antes a tela baixava o histórico inteiro (dezenas de milhares de linhas,
+  // lidas 1.000 por vez) e ainda gravava tudo no localStorage — era isso que
+  // fazia a página "não carregar". Agora só a página visível trafega.
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useHistoricoPaginado({ busca, plataforma: filter }, PAGINA);
   const { data: platforms = [] } = usePerfilPlataformas();
 
-  const results = useMemo(
-    () =>
-      history.filter((t) => {
-        const matchPlatform = filter === "all" || t.plataforma_chave === filter;
-        const q = query.trim().toLowerCase();
-        const matchQuery =
-          !q ||
-          t.nome_faixa.toLowerCase().includes(q) ||
-          t.nome_artista.toLowerCase().includes(q) ||
-          (t.nome_album ?? "").toLowerCase().includes(q);
-        return matchPlatform && matchQuery;
-      }),
-    [history, query, filter],
-  );
-
-  // Volta pro começo da paginação quando muda a busca/filtro.
-  useEffect(() => setVisiveis(PAGINA), [query, filter]);
-
-  const pagina = results.slice(0, visiveis);
+  const pagina = useMemo(() => (data?.pages ?? []).flatMap((p) => p.itens), [data]);
+  const total = data?.pages[0]?.total ?? null;
+  const filtrando = busca !== "" || filter !== "all";
+  const results = pagina;
 
   return (
     <AppShell>
@@ -99,15 +105,15 @@ function Historico() {
         ) : results.length === 0 ? (
           <EmptyState
             icon={Music4}
-            title={history.length === 0 ? "Nada por aqui ainda" : "Nenhum resultado"}
+            title={!filtrando ? "Nada por aqui ainda" : "Nenhum resultado"}
             description={
-              history.length === 0
+              !filtrando
                 ? "Conecte uma plataforma e sincronize para ver suas reproduções."
                 : "Tente outra busca ou remova os filtros."
             }
           />
         ) : (
-          pagina.map((t) => {
+          results.map((t) => {
             const durationSec = Math.round((t.duracao_ms ?? 0) / 1000);
             return (
               <div key={t.id} className="flex items-center gap-3 p-3 sm:p-4">
@@ -165,19 +171,22 @@ function Historico() {
         )}
       </div>
 
-      {visiveis < results.length ? (
+      {total !== null && results.length > 0 ? (
+        <p className="mt-3 text-center text-xs text-muted-foreground">
+          Mostrando {results.length.toLocaleString("pt-BR")}
+          {total > results.length ? ` de ~${total.toLocaleString("pt-BR")}` : ""} reproduções
+          {isFetching && !isFetchingNextPage ? " · atualizando…" : ""}
+        </p>
+      ) : null}
+
+      {hasNextPage ? (
         <div className="mt-4 flex justify-center">
           <button
-            onClick={() => setVisiveis((v) => v + PAGINA)}
-            className="rounded-full bg-secondary px-5 py-2.5 text-sm font-medium text-secondary-foreground transition-colors hover:bg-muted"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="rounded-full bg-secondary px-5 py-2.5 text-sm font-medium text-secondary-foreground transition-colors hover:bg-muted disabled:opacity-60"
           >
-            Carregar mais ({results.length - visiveis} restantes)
-          </button>
-          <button
-            onClick={() => setVisiveis(results.length)}
-            className="ml-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Mostrar tudo
+            {isFetchingNextPage ? "Carregando…" : "Carregar mais"}
           </button>
         </div>
       ) : null}

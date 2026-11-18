@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Adiado } from "@/components/Adiado";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { CampoImagem } from "@/components/CampoImagem";
 import { EmptyState, ErrorState, SkeletonCards } from "@/components/States";
@@ -123,23 +124,26 @@ function PerfilPage() {
         </Link>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <GenerosCard />
-        <HorasCard />
-      </div>
+      {/* Cards abaixo da dobra só montam (e só chamam a API) perto do scroll. */}
+      <Adiado className="mt-6" minHeight={260}>
+        <div className="grid gap-4 md:grid-cols-2">
+          <GenerosCard />
+          <HorasCard />
+        </div>
+      </Adiado>
 
-      <div className="mt-6">
+      <Adiado className="mt-6" minHeight={200}>
         <TopSpotifyCard />
-      </div>
+      </Adiado>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <ImportarSpotify />
         <ImportarYoutubeMusic />
       </div>
 
-      <div className="mt-6">
+      <Adiado className="mt-6" minHeight={240}>
         <Amigos />
-      </div>
+      </Adiado>
 
       <div className="surface-card mt-6 p-5">
         <div className="flex items-center gap-3">
@@ -185,8 +189,8 @@ function PerfilPage() {
           <div>
             <p className="font-semibold">App Android (Sonora Listener)</p>
             <p className="text-xs text-muted-foreground">
-              Captura o que você ouve em qualquer app de música do celular (ex: YouTube
-              Music) e manda pro seu histórico aqui. Sempre a versão mais recente.
+              Captura o que você ouve em qualquer app de música do celular (ex: YouTube Music) e
+              manda pro seu histórico aqui. Sempre a versão mais recente.
             </p>
           </div>
         </div>
@@ -198,8 +202,8 @@ function PerfilPage() {
           Baixar APK
         </a>
         <p className="mt-2 text-[11px] text-muted-foreground">
-          É um APK fora da Play Store — o Android vai avisar disso na instalação, é
-          esperado. Depois de instalar, veja as instruções no próprio app.
+          É um APK fora da Play Store — o Android vai avisar disso na instalação, é esperado. Depois
+          de instalar, veja as instruções no próprio app.
         </p>
       </div>
 
@@ -228,19 +232,19 @@ function BotaoApagarHistorico() {
 
   const handleClick = () => {
     const primeiraConfirmacao = window.confirm(
-      "Isso apaga TODO o seu histórico de reproduções (todas as plataformas) e as conquistas desbloqueadas. Suas conexões com Spotify/YouTube Music continuam ativas. Essa ação não pode ser desfeita. Continuar?"
+      "Isso apaga TODO o seu histórico de reproduções (todas as plataformas) e as conquistas desbloqueadas. Suas conexões com Spotify/YouTube Music continuam ativas. Essa ação não pode ser desfeita. Continuar?",
     );
     if (!primeiraConfirmacao) return;
 
     const segundaConfirmacao = window.confirm(
-      "Tem certeza mesmo? Depois de apagar, você vai precisar reimportar o histórico do zero."
+      "Tem certeza mesmo? Depois de apagar, você vai precisar reimportar o histórico do zero.",
     );
     if (!segundaConfirmacao) return;
 
     apagar.mutate(undefined, {
       onSuccess: (r) => {
         toast.success(
-          `Histórico apagado: ${r.plays_apagadas} reproduções e ${r.conquistas_apagadas} conquistas removidas.`
+          `Histórico apagado: ${r.plays_apagadas} reproduções e ${r.conquistas_apagadas} conquistas removidas.`,
         );
       },
       onError: (e: Error) => toast.error(e.message),
@@ -457,17 +461,12 @@ function CartaoPerfil() {
           icon={Music4}
         />
         <TempoEscutaCard totalMinutos={resumo?.totalMinutos} />
-        <StatCard
-          label="Artistas"
-          value={String(resumo?.artistasUnicos ?? 0)}
-          icon={Disc3}
-        />
+        <StatCard label="Artistas" value={String(resumo?.artistasUnicos ?? 0)} icon={Disc3} />
         <StatCard label="Conquistas" value={String(perfil.total_conquistas ?? 0)} icon={Trophy} />
       </div>
     </>
   );
 }
-
 
 function GenerosCard() {
   const { data = [], isLoading } = useGeneros(8);
